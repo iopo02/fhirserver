@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 17:05:09",
+    "Patient": {
+      "ID": "1783969709879769552",
+      "Birthdate": "24/12/2001"
+    },
+    "Report": {
+      "AccessionNumber": "142021260628",
+      "Exam_Type": "TC da coluna sacro-cocc\u00edgea",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 Doente com dificuldade de locomo\\'e7\\'e3o por volumoso tumor lombossagrado.\\par Consulta no dia 11/10 as 12h. \\par Pe\\'e7o realiza\\'e7\\'e3o de TC LS para o mesmo dia pelas 10/11h se possivel\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\deflang1053{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}} \\viewkind4\\uc1\\pard\\sa200\\sl276\\slmult1\\qj\\lang2070\\b\\f0\\fs24Informa\\'e7\\'e3o cl\\'ednica:\\b0\\line 19 anos,Doente com dificuldade de locomo\\'e7\\'e3o por volumoso tumor lombossagrado.\\par Consulta no dia 11/10 as 12h. \\par Pe\\'e7o realiza\\'e7\\'e3o de TC LS para o mesmo dia pelas 10/11h se possivel\\par \\pard\\b Relat\\'f3rio:\\par \\b0 Estudo sensivelmente sobrepon\\'edvel ao exame de TC da coluna lombossagrada datado de 29/04/2021, com dimens\\'f5es e morfologia sobrepon\\'edveis da extensa les\\'e3o tumoral sagrada, com m\\'faltiplas septa\\'e7\\'f5es e \\'e1reas l\\'edticas no seu seio. Identifica-se aparente moldagem sobrepon\\'edvel das estruturas neuromen\\'edngeas do canal sagrado abaixo de S1.\\par Continua a identificar-se discreto espessamento e densifica\\'e7\\'e3o dos tecidos moles pr\\'e9-sagrados envolver a massa \\'e0 esquerda, mais evidente em topografia inferior.\\par N\\'e3o se observam altera\\'e7\\'f5es espondilodiscartr\\'f3sicas nos elementos lombares estudados que condicionem efeito de massa sobre estudo nervosas do canal central e canais de conjuga\\'e7\\'e3o.\\par } ",
+      "Validation_Timestamp": "14/10/2021 11:53:07"
+    }
+  }
+}

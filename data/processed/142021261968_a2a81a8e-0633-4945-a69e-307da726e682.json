@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 19:06:42",
+    "Patient": {
+      "ID": "1825129463352769552",
+      "Birthdate": "20/07/1972"
+    },
+    "Report": {
+      "AccessionNumber": "142021261968",
+      "Exam_Type": "Ecografia renal",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 Transplante renal em 8/2021 - controlo de 2 cole\\'e7\\'f5es perirrenais com conte\\'fado ecog\\'e9neo (hematomas res\\'edduais?) - no ter\\'e7o superior algo anfractuoso e com extens\\'e3o ao tecido subcut\\'e2neo, com cerca de 7 cm de maior eixo e 2 cm de eixo transversal onde ultrapassa os planos musculares; ao n\\'edvel do ter\\'e7o inferior bem delimitado e que mede 8,5 x 3,1 x 5,3 cm.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\deflang1053{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}} \\viewkind4\\uc1\\pard\\lang2070\\b\\f0\\fs24Ecografia renal com Doppler\\par \\par Informa\\'e7\\'e3o cl\\'ednica:\\b0\\par \"Transplante renal em 8/2021 - controlo de 2 cole\\'e7\\'f5es perirrenais com conte\\'fado ecog\\'e9neo (hematomas res\\'edduais?) - no ter\\'e7o superior algo anfractuoso e com extens\\'e3o ao tecido subcut\\'e2neo, com cerca de 7 cm de maior eixo e 2 cm de eixo transversal onde ultrapassa os planos musculares; ao n\\'edvel do ter\\'e7o inferior bem delimitado e que mede 8,5 x 3,1 x 5,3 cm.\"\\par \\line\\b Relat\\'f3rio:\\b0\\par \\par Rim transplantado na fossa il\\'edaca esquerda, normodimensionado apresentando espessura parenquimatosa conservada com diferencia\\'e7\\'e3o parenquimossinusal mantida. Os contornos renais encontram-se algo bosselados por efeito de moldagem exercido pelas duas colec\\'e7\\'f5es perirrenais cont\\'edguas, a maior localizada adjacente ao polo superior e que se estende \\'e0 parede abdominal medindo cerca de 11,3 x 5,2 cm e a outra, mais inferior, medindo cerca de 9x5 cm. As caracter\\'edsticas ecogr\\'e1ficas destas cole\\'e7\\'f5es s\\'e3o sugestivas de linfocelo. \\par N\\'e3o existe significativa dilata\\'e7\\'e3o pielocalicial, notando-se ligeiro espessamento do urot\\'e9lio da \\'e1rvore excretora intrasinusal (aspecto inespec\\'edfico no contexto de transplante renal).\\par A vasculariza\\'e7\\'e3o parenquimatosa est\\'e1 mantida na an\\'e1lise por power Doppler e Doppler cor. Os \\'edndices de resist\\'eancia apresentam valores compreendidos entre 0.65-0.70. \\line A art\\'e9ria renal encontra-se perme\\'e1vel e sem evid\\'eancia de velocidades sist\\'f3licas aumentadas, incluindo no segmento justa-anastom\\'f3tico.\\par Fluxo venoso parenquimatoso mantido. Veia renal perme\\'e1vel com adequado fluxo. \\par Art\\'e9ria il\\'edaca externa perme\\'e1vel e com fluxo trif\\'e1sico mantido.\\par \\par \\line Dr. Ricardo Pereira Dias\\par } ",
+      "Validation_Timestamp": "28/10/2021 09:28:47"
+    }
+  }
+}

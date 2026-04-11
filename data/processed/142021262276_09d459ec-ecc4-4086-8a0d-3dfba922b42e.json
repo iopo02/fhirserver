@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 18:07:48",
+    "Patient": {
+      "ID": "1814992272844769552",
+      "Birthdate": "31/12/1971"
+    },
+    "Report": {
+      "AccessionNumber": "142021262276",
+      "Exam_Type": "Estudo electromiogr\u00e1fico dos membros superiores ou dos membros i",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 Parestesias e diminui\\'e7\\'e3o da FM MIE. Status infec\\'e7ao a SARS-CoV2 em Abril, complicado de hematoma do psoas.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2070{\\fonttbl{\\f0\\fnil\\fcharset0 Times New Roman;}{\\f1\\fnil\\fcharset0 Arial;}} {\\colortbl ;\\red0\\green0\\blue0;} {\\*\\generator Riched20 10.0.19041}\\viewkind4\\uc1  \\pard\\sb160\\qc\\b\\i\\f0\\fs32\\par \\f1\\fs24Relat\\'f3rio \\cf1 de Electromiografia\\fs32\\par \\pard\\cf0\\b0\\i0\\fs24\\par \\ul EMG \\cf1 de dete\\'e7\\'e3o:\\par \\cf0\\ulnone\\par \\b\\i Longo abdutor da coxa, Tibial anterior \\'e0 esquerda - \\b0\\i0 sem altera\\'e7\\'f5es.\\b\\i\\par Vasto externo e Vasto interno \\'e0 esquerda \\b0\\i0 - abundante fibrilha\\'e7\\'e3o e potenciais lentos de desnerva\\'e7\\'e3o, em repouso; aus\\'eancia de atividade volunt\\'e1ria.\\par \\par Estudo \\cf1 das velocidades de condu\\'e7\\'e3o, potenciais sensitivos e Ondas F - ver tabela anexa.\\par \\cf0\\par \\ul\\b\\i\\fs24Conclus\\'e3o:\\ulnone\\b0\\i0\\par \\tab Estudo electromiogr\\'e1fico dos membros inferiores identifica grave les\\'e3o \\cf1 axonal do nervo femoral esquerdo, salientando-se a inexist\\'eancia de aspetos de reinerva\\'e7\\'e3o (progn\\'f3stico reservado). \\cf0\\ul\\b\\i\\fs32\\par }",
+      "Validation_Timestamp": "14/01/2022 10:01:00"
+    }
+  }
+}

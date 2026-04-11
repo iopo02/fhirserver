@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 20:46:48",
+    "Patient": {
+      "ID": "1824735729633769552",
+      "Birthdate": "21/09/1967"
+    },
+    "Report": {
+      "AccessionNumber": "142021260695",
+      "Exam_Type": "TC p\u00e9lvico",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 Mulher de 54 anos, com diagn\\'f3stico de LMC, agora em fase bl\\'e1stica, internada na hematologia para QT, com febre, aumento de PIs mesmo sob AB emp\\'edrica e quadro de fezes com cheiro f\\'e9tido associado a aumento da ALT, GGT e bilirrubina. Pede-se TC para despiste de foco abdominal.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 TC AP - EXAME URGENTE\\par \\par Estudo antes e ap\\'f3s contraste.\\par Ligeiro derrame pleural bilateral.\\par Imagem microquistica no rim esquerdo.\\par Ba\\'e7o acess\\'f3rio.\\par Quisto na regi\\'e3o anexial esquerda, medindo 17 mm.\\par Raras e pequenas adenopatias no abd\\'f3men e p\\'e9lvis.\\par Espessamento parietal difuso do c\\'f3lon ascendente, associado a densifica\\'e7\\'e3o da gordura adjacente, sugestivo de colite.\\par Ligeiro derrame nos quadrantes direitos.\\par Sem outras altera\\'e7\\'f5es relevantes.\\par Relat\\'f3rio validado por: Miguel Seco (N\\'ba Ordem dos M\\'e9dicos: 44079)\\par Relat\\'f3rio validado em: 2021-10-04 21:55\\par \\par}",
+      "Validation_Timestamp": "04/10/2021 21:56:00"
+    }
+  }
+}

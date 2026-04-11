@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 16:14:24",
+    "Patient": {
+      "ID": "1736454947405480552",
+      "Birthdate": "18/04/1949"
+    },
+    "Report": {
+      "AccessionNumber": "142021262431",
+      "Exam_Type": "TC do t\u00f3rax com alta resolu\u00e7\u00e3o",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 COVID 19 05.2021 grave -- pneumonia organizativa - Oxig\\'e9nio alto fluxo\\par TEP\\par Alta sob PDN em desmame (doente com AR e previamente j\\'e1 sob PDN 15 que mantem)\\par Cansa\\'e7o acentuado\\par Pede-se TCAR tx reav\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\deflang1053{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}} \\viewkind4\\uc1\\pard\\lang2070\\f0\\fs24TC tor\\'e1cica\\par \\par Aquisi\\'e7\\'e3o volum\\'e9trica dos \\'e1pices pulmonares at\\'e9 \\'e0s hemic\\'fapulas diafragm\\'e1ticas sem injec\\'e7\\'e3o endovenosa de contraste iodado. Reconstru\\'e7\\'f5es multiplanares de 1 e 1,5 mm em algoritmo de pulm\\'e3o e partes moles respectivamente. Compara\\'e7\\'e3o com o estudo de 31/05/2021.\\par \\par \\par \\'c1rvore traqueobr\\'f4nquica proximal perme\\'e1vel e de calibre mantido.\\par Evolu\\'e7\\'e3o favor\\'e1vel das m\\'faltiplas \\'e1reas de consolida\\'e7\\'e3o parenquimatosa pulmonar, persistindo com menor express\\'e3o dimensional focos de densifica\\'e7\\'e3o reticular do par\\'eanquima e componente consolidativo predominantemente em banda, a que se associam discretas bronquiolectasias de trac\\'e7\\'e3o, sem evid\\'eancia de padr\\'e3o \"em favo de mel\", aspectos com ligeira maior express\\'e3o nos lobos superiores, compat\\'edveis com evolu\\'e7\\'e3o fibrocicatricial das \\'e1reas de pneumonia organizativa. Persistem, predominantemente nos lobos inferiores zonas de t\\'e9nue densifica\\'e7\\'e3o em vidro despolido, algumas sem significativa express\\'e3o reticular bronquiect\\'e1sicos adjacente, bem assim favorecer a sua natureza inflamat\\'f3ria persistente.\\par \\par Sem derrame pleural bilateralmente. Ligeiro espessamento do peric\\'e1rdio, com fina l\\'e2mina l\\'edquida. Regular defini\\'e7\\'e3o dos grandes vasos mediast\\'ednicos. Calcifica\\'e7\\'f5es ateromatosas da aorta. Tronco arterial pulmonar com calibre normal.\\par Pequenos g\\'e2nglios mediast\\'ednicos sem dimens\\'f5es patol\\'f3gicas. N\\'e3o se observam adenomegalias axilares ou supraclaviculares.\\par Ligeiro aumento dimensional da tir\\'f3ide, com esbo\\'e7o nodular na vertente inferior do lobo esquerdo.\\par \\par \\par \\par Dr.\\'aa Dulce Antunes\\par } ",
+      "Validation_Timestamp": "28/10/2021 13:41:00"
+    }
+  }
+}

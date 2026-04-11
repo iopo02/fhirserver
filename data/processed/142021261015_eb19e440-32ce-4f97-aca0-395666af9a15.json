@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 17:39:41",
+    "Patient": {
+      "ID": "1830696278833769552",
+      "Birthdate": "21/09/1960"
+    },
+    "Report": {
+      "AccessionNumber": "142021261015",
+      "Exam_Type": "TC do cr\u00e2nio",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 PCR extra-hospitalar  por TEP central, tendo realizado tromb\\'f3lise a 04/10. posterior documenta\\'e7\\'e3o de oclus\\'e3o da car\\'f3tida interna esquerda com AVC isqu\\'e9mico FTP esquerdo. Solicita-se TC-CE de reavalia\\'e7\\'e3o \\'e0s 24h.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\deflang1053{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}} \\viewkind4\\uc1\\pard\\lang2070\\b\\f0\\fs24TC cr\\'e2nio-encef\\'e1lica - Internamento\\par \\par Informa\\'e7\\'e3o cl\\'ednica:\\b0\\par 61 anos. PCR extra-hospitalar  por TEP central, tendo realizado tromb\\'f3lise a 04/10. Posterior documenta\\'e7\\'e3o de oclus\\'e3o da car\\'f3tida interna esquerda com AVC isqu\\'e9mico FTP esquerdo. Solicita-se TC-CE de reavalia\\'e7\\'e3o \\'e0s 24h.\\par \\par \\b Leitura e interpreta\\'e7\\'e3o das imagens:\\par \\b0 Efectuado estudo comparativo com TC cr\\'e2nio-encef\\'e1lica datada de 04/10/2021, observando-se acentua\\'e7\\'e3o da hipodensidade e marcado aumento da extens\\'e3o da \\'e1rea de enfarte isqu\\'e9mico previamente documentada, actualmente envolvendo a regi\\'e3o lent\\'edculo-caudado-capsular esquerda, com extens\\'e3o cortico-subcortical hemisf\\'e9rica, poupando a regi\\'e3o paramediana frontoparietal e a face interna t\\'eamporo-occipital.  No seio da les\\'e3o, no lenticular \\'e0 esquerda, observam-se discretas hiperdensidades pet\\'e9quiais confluentes que poder\\'e3o traduzir incipiente transforma\\'e7\\'e3o hemorr\\'e1gica (HI2 segundo a classifica\\'e7\\'e3o ECASS II).\\par A les\\'e3o determina maior efeito de massa, traduzido por apagamento sulcal locorregional e da vala s\\'edlvica esquerda, moldagem do ventr\\'edculo lateral esquerdo com colapso do \\'e1trio e corno temporal, e incipiente hernia\\'e7\\'e3o subfalcial direita (5,5 mm ao n\\'edvel dos foramina de Monro).\\par \\par Observa-se \\i de novo\\i0 , \\'e1rea focal de hipodensidade em topografia p\\'f3stero-interna no hemisf\\'e9rio cerebeloso esquerdo, sem significativo efeito de massa, traduzindo enfarte isqu\\'e9mico recente.\\par \\par Persiste id\\'eantica hiperdensidade espont\\'e2nea linear desde as ap\\'f3fise clinoideias anteriores \\'e0 vertente anterior da vala s\\'edlvica, traduzindo prov\\'e1vel trombo intraluminal.\\par Sem sinais de hidrocefalia.\\par \\par Restantes achados imagiol\\'f3gicos sensivelmente sobrepon\\'edveis aos do estudo de refer\\'eancia.\\par \\par Hugo Loureiro Cadilha\\par } ",
+      "Validation_Timestamp": "05/10/2021 15:07:25"
+    }
+  }
+}

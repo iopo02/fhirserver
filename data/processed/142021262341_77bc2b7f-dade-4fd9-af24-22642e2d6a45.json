@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 15:32:44",
+    "Patient": {
+      "ID": "1578703827852119552",
+      "Birthdate": "28/01/1953"
+    },
+    "Report": {
+      "AccessionNumber": "142021262341",
+      "Exam_Type": "TC do cr\u00e2nio",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 TCE grave com focos contus\\'e3o e HSD com hipertens\\'e3o intra-craniana. Pe\\'e7o TAC-CE p\\'f3s remo\\'e7\\'e3o de PIC e para reavalia\\'e7\\'e3o de les\\'e3o estrutural.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\deflang1053{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}} \\viewkind4\\uc1\\pard\\lang2070\\b\\f0\\fs24T.C. Cr\\'e2nio-encef\\'e1lica (Internamento)\\b0\\par \\par \\ul Informa\\'e7\\'e3o cl\\'ednica:\\ulnone\\line TCE grave com focos contus\\'e3o e HSD com hipertens\\'e3o intra-craniana. Pe\\'e7o TAC-CE p\\'f3s remo\\'e7\\'e3o de PIC e para reavalia\\'e7\\'e3o de les\\'e3o estrutural.\\line\\line\\ul Relat\\'f3rio:\\ulnone\\par Comparativamente com a T.C. Cr\\'e2nio-encef\\'e1lica datada de 30/09/2021 identifica-se atenua\\'e7\\'e3o global das densidade \\par hem\\'e1ticas intracranianas, nomeadamente do hematoma frontoparietal esquerdo, que tem fissura\\'e7\\'e3o extra-axial; de pequeno foco hemorr\\'e1gico parenquimatoso parietal direito e dois pequenos sedimentos hem\\'e1ticos nos cornos occipitais. Sem sinais de re-hemorragia.\\par \\par Persiste edema parenquimatoso na periferia do hematoma frontoparietal esquerdo, aspectos que no seu conjunto, continua a condicionar marcado efeito de massa que se traduz por apagamento sulcal locorregional, moldagem do ventr\\'edculo lateral esquerdo e hernia\\'e7\\'e3o do par\\'eanquima encef\\'e1lico atrav\\'e9s da craniectomia descompressiva.\\par \\par Persiste colec\\'e7\\'e3o epidural sero-hemato-gasosa posteriormente ao seio longitudinal superior esquerdo, que se continua com colec\\'e7\\'e3o epicraniano de semelhantes caracter\\'edsticas da convexidade frontoparietal e fossa temporal esquerdas, em prov\\'e1vel rela\\'e7\\'e3o com pseudomeningocelo.\\par \\par Estabilidade morfodimensional do sistema ventricular, sem sinais hidrocefalia activa.\\par Cisternas da base perme\\'e1veis.\\par Estruturas da linha m\\'e9dia centradas.\\par \\par Restantes aspectos globalmente sobrepon\\'edveis ao exame de refer\\'eancia.\\par \\par Jo\\'e3o B. Madureira\\par } ",
+      "Validation_Timestamp": "08/10/2021 11:41:10"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 18:19:40",
+    "Patient": {
+      "ID": "1830517266385769552",
+      "Birthdate": "21/11/1960"
+    },
+    "Report": {
+      "AccessionNumber": "142021262576",
+      "Exam_Type": "TC, adicional de Angio TC",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 DOENTE ADMITIDO EM CHOQUE S\\'c9PTICO COM FASCEITE NECROTIZANTE CERVICAL. AFRAVAMENTO COM PCR. PEDE SE AVALIA\\'c7\\'c3O COM ANGIO PARA EXCLUSAO DE SINDROME LEMIER.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 TC PESCO\\'c7O E T\\'d3RAX de urg\\'eancia \\par \\par PROTOCOLO T\\'c9CNICO:\\par Imagens adquiridas ap\\'f3s administra\\'e7\\'e3o de contraste iodado iv\\par \\par Pes\\'e7oco:\\par Em rela\\'e7\\'e3o com hist\\'f3ria fornecida observam-se m\\'faltiplas locas de g\\'e1s ao longo dos planos cervicais e faciais, com drenos subcut\\'e2neos na face cervical anterior bilateralmente. Estas locas estendem-se distalmente ao t\\'f3rax.\\par Traqueia com marcado volume de secre\\'e7\\'f5es a montante do tubo de traqueostomia in situ.\\par Realce far\\'edngeo difuso de prov\\'e1vel natureza inflamat\\'f3ria/infecciosa.\\par Abcesso parafar\\'edngeo esquerdo com 3x2cm. \\par Les\\'e3o quistica est\\'e1vel inferior ao pavilh\\'e3o auricular direito com 3 cm.\\par Les\\'e3o subcut\\'e2nea (6 x 2 cm) ao n\\'edvel da regi\\'e3o temporal direita, sem realce perif\\'e9rico. \\par Poss\\'edvel trombo da veia jugular interna direita (conflu\\'eancia com VSC), a correlacionar com achados ecogr\\'e1ficos.\\par \\par T\\'f3rax:\\par Derrame pleural \\'e0 direita de volume moderado com atelectasia e focos consolidativos do par\\'eanquima adjacente. Nodularidade centrilobular de predomino apical em poss\\'edvel rela\\'e7\\'e3o com altera\\'e7\\'f5es inflamat\\'f3rias/ infeciosas.\\par Derrame pleural esquerdo de pequeno volume. Sem cavita\\'e7\\'f5es. \\par Adenopatias mediast\\'ednicas reactivas.\\par Marcada disrup\\'e7\\'e3o cut\\'e2nea na parede anterior direita do t\\'f3rax.\\par Sonda nasogastrica in situ.\\par Ascite.\\par \\par Edema subcut\\'e2neo difuso.\\par \\par Relat\\'f3rio validado por: Eva Serr\\'e3o (N\\'ba Ordem dos M\\'e9dicos: 46431)\\par Relat\\'f3rio validado em: 2021-10-07 00:39\\par \\par}",
+      "Validation_Timestamp": "07/10/2021 00:40:00"
+    }
+  }
+}

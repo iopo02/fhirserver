@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 15:38:27",
+    "Patient": {
+      "ID": "1719825409692480552",
+      "Birthdate": "21/10/1967"
+    },
+    "Report": {
+      "AccessionNumber": "142021262034",
+      "Exam_Type": "Imag Geral - TC, suplemento de contraste endovenoso",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 Tumor com cerca de 4cm de di\\'e2metro de consist\\'eancia endurecida, im\\'f3vel e ulcerada na regi\\'e3o retroauricular esquerda. Crescimento progressivo nos \\'faltimos 2 meses. Sem sinais inflamat\\'f3rios nem exsudados associados.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\deflang1053{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}} \\viewkind4\\uc1\\pard\\lang2070\\b\\f0\\fs24TC DO PESCO\\'c7O\\par \\par INFORMA\\'c7\\'c3O CL\\'cdNICA: \\b0 \"Tumor com cerca de 4cm de di\\'e2metro de consist\\'eancia endurecida, im\\'f3vel e ulcerada na regi\\'e3o retroauricular esquerda. Crescimento progressivo nos \\'faltimos 2 meses. Sem sinais inflamat\\'f3rios nem exsudados associados.\"\\par \\par \\b PROTOCOLO T\\'c9CNICO: \\b0 Aquisi\\'e7\\'e3o volum\\'e9trica multidetetores com reconstru\\'e7\\'f5es de 2mm de espessura e reformata\\'e7\\'f5es nos planos sagital e coronal. Estudo efetuado antes e ap\\'f3s administra\\'e7\\'e3o endovenosa de contraste iodado.\\par \\par \\b LEITURA E INTERPRETA\\'c7\\'c3O:\\b0\\par COMPARATIVO: TC do cr\\'e2nio de 19/07/2021\\par \\par Artefactos condicionados pelas pe\\'e7as dent\\'e1rias.\\par \\par Les\\'e3o s\\'f3lida retroauricular esquerda, medindo cerca de 6x3,7x1,8cm (eixos LxAPxT). A les\\'e3o apresenta um aspeto infiltrativo e contornos espiculados, estendendo-se \\'e0 pele e n\\'e3o se observando plano de gordura entre a a les\\'e3o e os m\\'fasculos subadjacentes.\\par Posteriormente \\'e0 les\\'e3o observa-se um n\\'f3dulo subcut\\'e2neo com cerca de 9x8mm (adenopatia?).\\par Coexistem outras adenopatias nos n\\'edveis II e IV esquerdos (pelo menos 4), a maior com 10x8mm.\\par Pequenos g\\'e2nglios cervicais direitas, sem crit\\'e9rios morfol\\'f3gicos de adenopatia.\\par Restantes partes moles do pesco\\'e7o sem altera\\'e7\\'f5es tomodensitom\\'e9tricas de relevo.\\par Nos cortes que intercetam os andares superiores do t\\'f3rax, observam-se alguns n\\'f3dulos pulmonares, sugerindo-se avalia\\'e7\\'e3o por TC do t\\'f3rax.\\par \\par Sara Peixoto\\par M\\'e9dica Interna de Radiologia\\par } ",
+      "Validation_Timestamp": "20/10/2021 11:19:20"
+    }
+  }
+}

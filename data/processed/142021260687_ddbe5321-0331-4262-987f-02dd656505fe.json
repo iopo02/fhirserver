@@ -1,0 +1,16 @@
+{
+  "PACS_Report": {
+    "Extraction_Timestamp": "14/02/2023 15:50:51",
+    "Patient": {
+      "ID": "1750931443291769552",
+      "Birthdate": "27/04/1955"
+    },
+    "Report": {
+      "AccessionNumber": "142021260687",
+      "Exam_Type": "TC do t\u00f3rax",
+      "Observation": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 Doente de 66 anos internada na UTIC por shock cardiog\\'e9nico 2o a intoxica\\'e7\\'e3o por BB.\\par TC torax do 24/9 apresenta \\'22Condensa\\'e7\\'e3o periferica no segmento externo do lobo m\\'e9dio ... n\\'e3o sendo possivel excluir malignidade. Sugere-se  por precau\\'e7\\'e3o reavalia\\'e7\\'e3o a curto prazo por TC\\'22.  Agora tributaria a estudo etiol\\'f3gico da cardiopat\\'eda com risco de precisar terapia antitromb\\'f3tica triple.\\par Solicitamos estudo de imagem pulmonar para controlo apos de 7 dias P/T para descartar neoplasia que condicione a atitude cardiol\\'f3gica. ESTUDO SEM CONTRASTE.\\par}",
+      "Report": "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang2057{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}{\\f1\\fnil\\fcharset0 Arial;}}{\\*\\JS CHULN 2020}\\viewkind4\\uc1\\pard\\qj\\f1\\fs24\\lang2070 TC T\\'d3RAX URGENTE\\par \\par Raras e pequenas adenopatias mediastinicas.\\par Bronquiectasias no LSE.\\par Sugest\\'e3o de opacidades sequelares no LSE.\\par Ligeiro derrame pleural bilateral.\\par Atelectasia perif\\'e9rica no LID.\\par Bolha no LID.\\par Cardiomeg\\'e1lia.\\par No LID observamos \\'e1reas de densifica\\'e7\\'e3o parenquimatosa em vidro despolido - processo inflamat\\'f3rio?\\par H\\'e1 opacidades em banda, de prov\\'e1vel natureza fibro-atelect\\'e1sica.\\par Sem outras altera\\'e7\\'f5es relevantes.\\par \\par Relat\\'f3rio validado por: Miguel Seco (N\\'ba Ordem dos M\\'e9dicos: 44079)\\par Relat\\'f3rio validado em: 2021-10-04 21:38\\par \\par}",
+      "Validation_Timestamp": "04/10/2021 21:39:00"
+    }
+  }
+}
