@@ -1,54 +1,82 @@
 import requests
 from faker import Faker
-import concurrent.futures
 import time
+import random
+from datetime import datetime
 
-# Configurações iniciais
 fake = Faker()
-HAPI_URL = "http://localhost:8080/fhir/Patient"
+BASE_URL = "http://localhost:8080/fhir"
 
-def gerar_e_enviar_paciente(i):
-    """Gera um paciente aleatório e envia para o servidor."""
-    patient_id = f"test-patient-{i}"
-    payload = {
-        "resourceType": "Patient",
-        "id": patient_id,
-        "name": [{"family": fake.last_name(), "given": [fake.first_name()]}],
-        "birthDate": str(fake.date_of_birth(minimum_age=18, maximum_age=90))
-    }
+def criar_paciente_completo(idx):
+    p_id = f"pat-{idx}"
+    obs_id = f"obs-{idx}"
+    enc_id = f"enc-{idx}"
     
-    try:
-        # Timeout de 10s para evitar que o script fique preso se o HAPI demorar
-        requests.put(f"{HAPI_URL}/{patient_id}", json=payload, timeout=10)
-    except Exception as e:
-        print(f"Erro ao enviar paciente {i}: {e}")
+    # Gerar data no formato ISO 8601 correto: YYYY-MM-DDTHH:MM:SS
+    data_consulta = fake.date_time_this_year().isoformat()
+    data_nascimento = fake.date_of_birth(minimum_age=18, maximum_age=90).strftime('%Y-%m-%d')
+    
+    return [
+        {
+            "fullUrl": f"Patient/{p_id}",
+            "resource": {
+                "resourceType": "Patient",
+                "id": p_id,
+                "name": [{"family": fake.last_name(), "given": [fake.first_name()]}],
+                "gender": fake.random_element(["male", "female"]),
+                "birthDate": data_nascimento
+            },
+            "request": {"method": "PUT", "url": f"Patient/{p_id}"}
+        },
+        {
+            "fullUrl": f"Encounter/{enc_id}",
+            "resource": {
+                "resourceType": "Encounter",
+                "id": enc_id,
+                "status": "finished",
+                "class": {"system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "AMB"},
+                "subject": {"reference": f"Patient/{p_id}"},
+                "period": {"start": data_consulta} # Agora com o 'T'
+            },
+            "request": {"method": "PUT", "url": f"Encounter/{enc_id}"}
+        },
+        {
+            "fullUrl": f"Observation/obs-{idx}",
+            "resource": {
+                "resourceType": "Observation",
+                "id": obs_id,
+                "status": "final",
+                "code": {"coding": [{"system": "http://loinc.org", "code": "2339-0", "display": "Glucose"}]},
+                "subject": {"reference": f"Patient/{p_id}"},
+                "valueQuantity": {"value": round(random.uniform(70, 140), 1), "unit": "mg/dL"}
+            },
+            "request": {"method": "PUT", "url": f"Observation/obs-{idx}"}
+        }
+    ]
 
-def gerar_em_lotes(total_objetivo, tamanho_lote=5000):
-    """Gere a ingestão em blocos para não sobrecarregar o PostgreSQL."""
-    total_atual = 0
-    while total_atual < total_objetivo:
-        inicio = total_atual
-        fim = min(total_atual + tamanho_lote, total_objetivo)
+def executar_carga_final(total_pacientes, lote_tamanho=50):
+    print(f"🚀 A iniciar carga de {total_pacientes} pacientes...")
+    inicio = time.time()
+    
+    for i in range(0, total_pacientes, lote_tamanho):
+        batch_entries = []
+        for j in range(i, i + lote_tamanho):
+            if j >= total_pacientes: break
+            batch_entries.extend(criar_paciente_completo(j))
+            
+        bundle = {"resourceType": "Bundle", "type": "transaction", "entry": batch_entries}
         
-        print(f"\n>>> A processar lote: {inicio} até {fim} (Alvo: {total_objetivo})")
-        
-        # Usamos 15 workers para um equilíbrio entre velocidade e estabilidade
-        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-            executor.map(gerar_e_enviar_paciente, range(inicio, fim))
-        
-        total_atual = fim
-        print(f"--- Lote concluído. Pausa técnica de 5s para o disco/RAM respirar... ---")
-        time.sleep(5)
+        try:
+            res = requests.post(BASE_URL, json=bundle, timeout=30)
+            if res.status_code == 200:
+                print(f"✅ Lote {i//lote_tamanho + 1} OK ({i + lote_tamanho}/{total_pacientes})")
+            else:
+                print(f"❌ Erro: {res.json()['issue'][0]['diagnostics']}")
+        except Exception as e:
+            print(f"💥 Falha: {e}")
+
+    print(f"\n✨ Concluído em {(time.time() - inicio)/60:.2f} minutos.")
 
 if __name__ == "__main__":
-    print("Iniciando Stress Test do Repositório FHIR...")
-    tempo_inicio = time.time()
-    
-    # Define aqui o total que queres atingir
-    TOTAL_FINAL = 100000 
-    
-    gerar_em_lotes(TOTAL_FINAL)
-    
-    tempo_total = time.time() - tempo_inicio
-    print(f"\n✅ CONCLUÍDO: {TOTAL_FINAL} pacientes processados.")
-    print(f"Tempo total: {tempo_total/60:.2f} minutos.")
+    # Tenta com 1000 primeiro para confirmar que o erro 'T' desapareceu
+    executar_carga_final(100000)
