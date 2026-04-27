@@ -1,5 +1,6 @@
 *.orig
 target/
+data/
 *.iml
 
 # Compiled class file
