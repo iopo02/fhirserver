@@ -357,7 +357,7 @@ def _generate_summaries(observation: str, report: str, params: Dict[str, Any]) -
 
 
 def build_resources(raw: Dict[str, Any], summary_params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-    pacs = raw.get("PACS_Report") or raw.get("Report") or raw
+    pacs = raw.get("Clinical_Record") or raw.get("PACS_Report") or raw.get("Report") or raw
     if not isinstance(pacs, dict):
         return []
 
