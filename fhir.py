@@ -77,19 +77,12 @@ def sanitize_id(value: str, fallback: str) -> str:
 def make_resource_id(raw: Any, prefix: str, force_prefix: bool = False) -> Optional[str]:
     if not _has_required(raw):
         return None
-    
     raw_str = str(raw).strip()
-    
-    # Criamos o ID combinando o prefixo com o valor limpo
-    # Exemplo: 123 -> pat-123
     cleaned_body = _ID_RE.sub("", raw_str.replace(" ", "-")).lower()
     full_id = f"{prefix}-{cleaned_body}"
-    
-    # O FHIR tem um limite de 64 caracteres para IDs
     if len(full_id) > 64:
         digest = uuid.uuid5(uuid.NAMESPACE_URL, f"{prefix}:{raw_str}")
         return f"{prefix}-{digest.hex}"[:64]
-    
     return full_id
 
 
@@ -352,12 +345,16 @@ def _generate_summaries(observation: str, report: str, params: Dict[str, Any]) -
     try:
         from pipeline import summarization
         return summarization.summarize(text, **params)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger("pipeline.fhir").warning(
+            f"Summarization falhou: {type(exc).__name__}: {exc}"
+        )
         return None
 
 
 def build_resources(raw: Dict[str, Any], summary_params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-    pacs = raw.get("Clinical_Record") or raw.get("PACS_Report") or raw.get("Report") or raw
+    pacs = raw.get("PACS_Report") or raw.get("Report") or raw
     if not isinstance(pacs, dict):
         return []
 
