@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FHIR Patient Live Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- SockJS and STOMP -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(20, 26, 46, 0.6);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #8a2be2;
+            --primary-glow: rgba(138, 43, 226, 0.4);
+            --accent-cyan: #00f2fe;
+            --accent-cyan-glow: rgba(0, 242, 254, 0.3);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --status-connected: #10b981;
+            --status-disconnected: #ef4444;
+            --status-connecting: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(at 10% 10%, rgba(138, 43, 226, 0.15) 0px, transparent 50%),
+                radial-gradient(at 90% 90%, rgba(0, 242, 254, 0.15) 0px, transparent 50%);
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(11, 15, 25, 0.8);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-section h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            border: 1px solid var(--border-color);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .status-dot.connected {
+            background-color: var(--status-connected);
+            color: var(--status-connected);
+        }
+
+        .status-dot.disconnected {
+            background-color: var(--status-disconnected);
+            color: var(--status-disconnected);
+        }
+
+        .status-dot.connecting {
+            background-color: var(--status-connecting);
+            color: var(--status-connecting);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            border-left: 3px solid var(--accent-cyan);
+            padding-left: 0.75rem;
+        }
+
+        /* Form styling */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 2px var(--accent-cyan-glow);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--primary));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.875rem;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+
+        .btn:hover {
+            box-shadow: 0 6px 20px var(--primary-glow), 0 0 15px var(--accent-cyan-glow);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Feed styling */
+        .feed-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+            max-height: 550px;
+            padding-right: 0.5rem;
+        }
+
+        .feed-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .feed-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .feed-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        .feed-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .no-notifications {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 3rem 0;
+            font-style: italic;
+        }
+
+        .notification-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .notification-card:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .notification-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--accent-cyan), var(--primary));
+        }
+
+        .notif-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .notif-title {
+            font-weight: 600;
+            color: var(--accent-cyan);
+            font-size: 1rem;
+        }
+
+        .notif-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .notif-detail {
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .notif-detail span {
+            color: var(--text-muted);
+        }
+
+        .notif-id-badge {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(138, 43, 226, 0.2);
+            color: #d8b4fe;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(138, 43, 226, 0.3);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.25rem;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-section">
+            <h1><span>⚡</span> FHIR Patient Live Feed</h1>
+        </div>
+        <div class="status-badge">
+            <span id="status-dot" class="status-dot disconnected"></span>
+            <span id="status-text">Disconnected</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Col 1: Trigger Form -->
+        <div class="card">
+            <h2>Quick Create Patient</h2>
+            <div id="alert-box" class="alert"></div>
+            
+            <form id="patient-form" onsubmit="createPatient(event)">
+                <div class="form-group">
+                    <label for="first-name">Given Name</label>
+                    <input type="text" id="first-name" placeholder="e.g. Jane" required>
+                </div>
+                <div class="form-group">
+                    <label for="last-name">Family Name</label>
+                    <input type="text" id="last-name" placeholder="e.g. Smith" required>
+                </div>
+                <div class="form-group">
+                    <label for="gender">Gender</label>
+                    <select id="gender">
+                        <option value="female">Female</option>
+                        <option value="male">Male</option>
+                        <option value="other">Other</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="birthdate">Birth Date</label>
+                    <input type="date" id="birthdate" value="1995-05-15" required>
+                </div>
+                <div class="form-group">
+                    <label for="identifier">Patient Identifier (Optional)</label>
+                    <input type="text" id="identifier" placeholder="e.g. US-SSN-123-45-6789">
+                </div>
+                <button type="submit" class="btn" id="submit-btn">
+                    <span>✨</span> Create Patient Resource
+                </button>
+            </form>
+        </div>
+
+        <!-- Col 2: Live Notifications Feed -->
+        <div class="card">
+            <h2>Live STOMP Notifications (/topic/patients)</h2>
+            <div class="feed-container" id="feed-container">
+                <div class="no-notifications" id="no-notifications">
+                    Waiting for patient creation events...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+
+        function connect() {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+
+            statusDot.className = 'status-dot connecting';
+            statusText.innerText = 'Connecting...';
+
+            // Establish Connection
+            const socket = new SockJS('/ws-patients');
+            stompClient = Stomp.over(socket);
+            
+            // Disable debug logging to keep console clean
+            stompClient.debug = null;
+
+            stompClient.connect({}, function (frame) {
+                statusDot.className = 'status-dot connected';
+                statusText.innerText = 'Connected';
+                console.log('Connected to WebSocket STOMP endpoint: ' + frame);
+
+                // Subscribe to topic
+                stompClient.subscribe('/topic/patients', function (message) {
+                    const payload = JSON.parse(message.body);
+                    console.log('Received live notification:', payload);
+                    addNotificationToFeed(payload);
+                });
+            }, function (error) {
+                statusDot.className = 'status-dot disconnected';
+                statusText.innerText = 'Connection Failed';
+                console.error('STOMP error:', error);
+                // Auto-retry connection in 5 seconds
+                setTimeout(connect, 5000);
+            });
+        }
+
+        function addNotificationToFeed(payload) {
+            const feedContainer = document.getElementById('feed-container');
+            const noNotif = document.getElementById('no-notifications');
+            if (noNotif) noNotif.remove();
+
+            const card = document.createElement('div');
+            card.className = 'notification-card';
+
+            const localTime = new Date(payload.timestamp).toLocaleTimeString();
+            const identifierText = payload.patientIdentifier ? payload.patientIdentifier : 'None';
+
+            card.innerHTML = `
+                <div class="notif-header">
+                    <span class="notif-title">Patient Created</span>
+                    <span class="notif-time">${localTime}</span>
+                </div>
+                <div class="notif-detail">
+                    <p><strong>Resource Path:</strong> <span class="notif-id-badge">${payload.resourceId}</span></p>
+                    <p><strong>Identifier:</strong> <span>${identifierText}</span></p>
+                    <p><strong>Timestamp:</strong> <span>${payload.timestamp}</span></p>
+                </div>
+            `;
+
+            feedContainer.insertBefore(card, feedContainer.firstChild);
+        }
+
+        async function createPatient(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const alertBox = document.getElementById('alert-box');
+            
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Creating...';
+            alertBox.style.display = 'none';
+
+            const firstName = document.getElementById('first-name').value;
+            const lastName = document.getElementById('last-name').value;
+            const gender = document.getElementById('gender').value;
+            const birthdate = document.getElementById('birthdate').value;
+            const identifier = document.getElementById('identifier').value;
+
+            // Construct FHIR R4 Patient JSON Resource
+            const patientResource = {
+                resourceType: "Patient",
+                name: [
+                    {
+                        use: "official",
+                        family: lastName,
+                        given: [firstName]
+                    }
+                ],
+                gender: gender,
+                birthDate: birthdate
+            };
+
+            if (identifier.trim() !== '') {
+                patientResource.identifier = [
+                    {
+                        use: "official",
+                        system: "http://hospital.org/patient-ids",
+                        value: identifier
+                    }
+                ];
+            }
+
+            try {
+                const response = await fetch('/fhir/Patient', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/fhir+json',
+                        'Accept': 'application/fhir+json'
+                    },
+                    body: JSON.stringify(patientResource)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    alertBox.className = 'alert alert-success';
+                    alertBox.innerText = `Successfully created Patient: Patient/${data.id}`;
+                    alertBox.style.display = 'block';
+                    
+                    // Clear name fields
+                    document.getElementById('first-name').value = '';
+                    document.getElementById('last-name').value = '';
+                    document.getElementById('identifier').value = '';
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'Server returned status ' + response.status);
+                }
+            } catch (err) {
+                alertBox.className = 'alert alert-error';
+                alertBox.innerText = `Failed to create patient: ${err.message}`;
+                alertBox.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>✨</span> Create Patient Resource';
+            }
+        }
+
+        // Connect on startup
+        connect();
+    </script>
+</body>
+</html>
