@@ -276,13 +276,13 @@ hapi:
     # -------------------------------------------------------------------------------
     # F. Write / Delete / Integrity
     # -------------------------------------------------------------------------------
-    # allow_cascading_deletes: true
-    # allow_contains_searches: true
-    # allow_external_references: true
-    # allow_multiple_delete: true
-    # allow_override_default_search_params: true
-    # auto_create_placeholder_reference_targets: false
-    # mass_ingestion_mode_enabled: false
+    allow_cascading_deletes: false
+    allow_contains_searches: false
+    allow_external_references: true              # HAPI-0507: Allow resources to reference external URLs
+    allow_multiple_delete: false
+    allow_override_default_search_params: false
+    auto_create_placeholder_reference_targets: false
+    mass_ingestion_mode_enabled: false
     # auto_version_reference_at_paths: Device.patient, Device.location, Device.parent, DeviceMetric.parent, DeviceMetric.source, Observation.device, Observation.subject
     # client_id_strategy: ALPHANUMERIC
     # server_id_strategy: SEQUENTIAL_NUMERIC

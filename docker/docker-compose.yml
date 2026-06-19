@@ -13,6 +13,12 @@ services:
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/fhir/metadata"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     depends_on:
       hapi-fhir-postgres:
         condition: service_healthy

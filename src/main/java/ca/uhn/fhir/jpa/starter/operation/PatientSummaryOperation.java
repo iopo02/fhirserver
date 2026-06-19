@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.ZoneOffset;
@@ -29,57 +30,41 @@ import java.util.stream.Collectors;
 /**
  * PatientSummaryOperation
  * ========================
- * Implementa a operação FHIR custom:
+ * Operação FHIR custom: GET /fhir/Patient/{id}/$summary
  *
- *   GET /fhir/Patient/{id}/$summary
+ * Parâmetros opcionais:
+ *   obsLimit  (integer, default 5, máx 20)
+ *   since     (date YYYY-MM-DD)
+ *   status    (string) — clinicalStatus das Conditions
  *
- * Parâmetros opcionais (query string ou OperationParam):
- *   obsLimit  (integer, default 5, máx 20)  — nº de Observations no resumo
- *   since     (date YYYY-MM-DD)             — filtrar recursos a partir desta data
- *   status    (string)                      — filtrar Conditions por clinicalStatus
- *
- * Devolve um Bundle FHIR R4 do tipo COLLECTION com:
- *   - DiagnosticReport com dois Observations contained:
+ * Devolve Bundle FHIR R4 COLLECTION com profile IPS contendo:
+ *   - DiagnosticReport com:
  *       #extractive-summary  — resumo estruturado em Português
- *       #abstractive-summary — parágrafo narrativo em Inglês
- *   - Patient
- *   - Conditions, Observations, Medications, Allergies, Procedures
- *
- * Registado automaticamente no CapabilityStatement do HAPI FHIR,
- * tornando a operação descobrível via GET /fhir/metadata.
- *
- * Referência: https://hl7.org/fhir/R4/operationdefinition.html
+ *       #abstractive-summary — parágrafo narrativo em PT + EN
+ *   - Patient, Conditions, Observations, Medications, Allergies, Procedures
  */
 @Component
 public class PatientSummaryOperation implements IResourceProvider {
 
     private static final Logger log = LoggerFactory.getLogger(PatientSummaryOperation.class);
 
-    // =========================================================
-    // CONSTANTES
-    // =========================================================
-
-    private static final int     DEFAULT_OBS_LIMIT = 5;
-    private static final int     MAX_OBS_LIMIT     = 20;
-
-    private static final String  LOINC_SYSTEM      = "http://loinc.org";
-    private static final String  IPS_PROFILE       =
+    private static final int    DEFAULT_OBS_LIMIT = 5;
+    private static final int    MAX_OBS_LIMIT     = 20;
+    private static final String LOINC_SYSTEM      = "http://loinc.org";
+    private static final String IPS_PROFILE       =
             "http://hl7.org/fhir/uv/ips/StructureDefinition/Bundle-uv-ips";
+    private static final String DATE_FORMAT       = "yyyy-MM-dd";
+    private static final String DATETIME_FORMAT   = "yyyy-MM-dd HH:mm:ss";
 
-    /** Mapeamento tipo de recurso → parâmetro de pesquisa pelo paciente */
     private static final Map<String, String> PATIENT_SEARCH_PARAM = Map.of(
-            "Condition",          "subject",
-            "Observation",        "subject",
-            "MedicationRequest",  "subject",
-            "MedicationStatement","subject",
-            "AllergyIntolerance", "patient",
-            "Procedure",          "subject",
-            "DiagnosticReport",   "subject"
+            "Condition",           "subject",
+            "Observation",         "subject",
+            "MedicationRequest",   "subject",
+            "MedicationStatement", "subject",
+            "AllergyIntolerance",  "patient",
+            "Procedure",           "subject",
+            "DiagnosticReport",    "subject"
     );
-
-    // =========================================================
-    // DEPENDÊNCIAS
-    // =========================================================
 
     private final DaoRegistry daoRegistry;
 
@@ -87,14 +72,8 @@ public class PatientSummaryOperation implements IResourceProvider {
         this.daoRegistry = daoRegistry;
     }
 
-    // =========================================================
-    // IResourceProvider — obrigatório para o HAPI registar a operação
-    // =========================================================
-
     @Override
     public Class<Patient> getResourceType() {
-        // Liga esta operação ao tipo Patient:
-        // o HAPI vai expô-la em /fhir/Patient/{id}/$summary
         return Patient.class;
     }
 
@@ -102,53 +81,37 @@ public class PatientSummaryOperation implements IResourceProvider {
     // OPERAÇÃO $summary
     // =========================================================
 
-    /**
-     * Operação FHIR:  GET /fhir/Patient/{id}/$summary
-     *
-     * idempotent = true  → o HAPI aceita GET (sem body) além de POST,
-     *                       e o resultado pode ser cacheado pelo cliente.
-     */
-    @Operation(
-        name       = "$summary",
-        idempotent = true,
-        type       = Patient.class
-    )
+    @Operation(name = "$summary", idempotent = true, type = Patient.class)
     public Bundle patientSummary(
-            @IdParam                                          IdType      patientId,
-            @OperationParam(name = "obsLimit", min = 0)      IntegerType obsLimitParam,
-            @OperationParam(name = "since",    min = 0)      DateType    sinceParam,
-            @OperationParam(name = "status",   min = 0)      StringType  statusParam) {
+            @IdParam                                     IdType      patientId,
+            @OperationParam(name = "obsLimit", min = 0) IntegerType obsLimitParam,
+            @OperationParam(name = "since",    min = 0) DateType    sinceParam,
+            @OperationParam(name = "status",   min = 0) StringType  statusParam) {
 
         String id         = patientId.getIdPart();
         int    obsLimit   = resolveObsLimit(obsLimitParam);
-        String since      = sinceParam  != null ? sinceParam.getValueAsString()  : null;
-        String condStatus = statusParam != null ? statusParam.getValue()         : null;
+        String since      = sinceParam  != null ? sinceParam.getValueAsString() : null;
+        String condStatus = statusParam != null ? statusParam.getValue()        : null;
 
         log.info("[PatientSummary] id={} obsLimit={} since={} status={}",
                 id, obsLimit, since, condStatus);
 
-        // --- 1. Carregar Patient (lança 404 se não existir) ---
-        Patient patient = loadPatient(id);
+        Patient        patient     = loadPatient(id);
+        List<Resource> conditions  = fetchConditions(id, condStatus);
+        List<Resource> observations= fetchObservations(id, since, obsLimit);
+        List<Resource> medications = fetchMedications(id);
+        List<Resource> allergies   = fetchResources("AllergyIntolerance", id, null);
+        List<Resource> procedures  = fetchResources("Procedure",          id, since);
 
-        // --- 2. Recolher recursos clínicos do repositório HAPI ---
-        List<Resource> conditions   = fetchConditions(id, condStatus);
-        List<Resource> observations = fetchObservations(id, since, obsLimit);
-        List<Resource> medications  = fetchMedications(id);
-        List<Resource> allergies    = fetchResources("AllergyIntolerance", id, null);
-        List<Resource> procedures   = fetchResources("Procedure",          id, since);
-
-        // --- 3. Construir DiagnosticReport com summaries contained ---
         DiagnosticReport report = buildDiagnosticReport(
-                id, patient,
-                conditions, observations, medications, allergies, procedures);
+                id, patient, conditions, observations, medications, allergies, procedures);
 
-        // --- 4. Montar e devolver Bundle ---
         return buildBundle(report, patient,
                 conditions, observations, medications, allergies, procedures);
     }
 
     // =========================================================
-    // CONSTRUÇÃO DO DIAGNOSTIC REPORT
+    // DIAGNOSTIC REPORT
     // =========================================================
 
     private DiagnosticReport buildDiagnosticReport(
@@ -162,77 +125,89 @@ public class PatientSummaryOperation implements IResourceProvider {
         report.setStatus(DiagnosticReport.DiagnosticReportStatus.FINAL);
         report.setSubject(new Reference("Patient/" + patientId));
         report.setIssued(new Date());
-
-        // Category: IPS Patient Summary (LOINC 60591-5)
         report.addCategory(codeable(LOINC_SYSTEM, "60591-5", "Patient Summary Document"));
-
-        // Code: identificador do tipo de relatório
         report.setCode(codeable(LOINC_SYSTEM, "60591-5", "Patient Summary Document"));
 
-        // ---- Extractive Summary (Português) ----
+        // ---- Extractive (PT) ----
         String extractiveText = buildExtractiveText(
-                patient, conditions, observations, medications, allergies, procedures);
-
+                patientId, patient, conditions, observations, medications, allergies, procedures);
         Observation extractiveObs = new Observation();
         extractiveObs.setId("extractive-summary");
         extractiveObs.setStatus(Observation.ObservationStatus.FINAL);
-        extractiveObs.setCode(codeable(LOINC_SYSTEM, "11369-6", "Extractive summary"));
+        extractiveObs.setCode(codeable(LOINC_SYSTEM, "11369-6", "Resumo Clínico Estruturado"));
         extractiveObs.setSubject(new Reference("Patient/" + patientId));
         extractiveObs.setValue(new StringType(extractiveText));
         report.addContained(extractiveObs);
 
-        // ---- Abstractive Summary (Inglês) ----
+        // ---- Abstractive (PT + EN) ----
         String abstractiveText = buildAbstractiveText(
                 patientId, patient, conditions, observations, medications, allergies, procedures);
-
         Observation abstractiveObs = new Observation();
         abstractiveObs.setId("abstractive-summary");
         abstractiveObs.setStatus(Observation.ObservationStatus.FINAL);
-        abstractiveObs.setCode(codeable(LOINC_SYSTEM, "11369-6", "Abstractive summary"));
+        abstractiveObs.setCode(codeable(LOINC_SYSTEM, "11369-6", "Resumo Narrativo / Narrative Summary"));
         abstractiveObs.setSubject(new Reference("Patient/" + patientId));
         abstractiveObs.setValue(new StringType(abstractiveText));
         report.addContained(abstractiveObs);
 
-        // Referências formais para os contained resources
         report.addResult()
                 .setReference("#extractive-summary")
-                .setDisplay("Extractive summary");
+                .setDisplay("Resumo Clínico Estruturado");
         report.addResult()
                 .setReference("#abstractive-summary")
-                .setDisplay("Abstractive summary");
+                .setDisplay("Resumo Narrativo / Narrative Summary");
 
         return report;
     }
 
     // =========================================================
-    // TEXTO EXTRACTIVO (Português)
+    // EXTRACTIVE SUMMARY — Português
     // =========================================================
 
     private String buildExtractiveText(
+            String patientId,
             Patient patient,
             List<Resource> conditions, List<Resource> observations,
             List<Resource> medications, List<Resource> allergies,
             List<Resource> procedures) {
 
         StringBuilder sb = new StringBuilder();
+
+        // Cabeçalho com metadados de origem
         sb.append("=== Resumo Clínico do Paciente ===\n\n");
+        sb.append("Fonte: Servidor HAPI FHIR R4 (HL7 FHIR R4)\n");
+        sb.append("Recurso: /fhir/Patient/").append(patientId).append("/$summary\n");
+        sb.append("Gerado em: ")
+          .append(new SimpleDateFormat(DATETIME_FORMAT).format(new Date()))
+          .append(" UTC\n");
+        sb.append("─────────────────────────────────────\n\n");
 
         // Dados demográficos
         sb.append("Paciente: ").append(patientDisplayName(patient)).append("\n");
 
         if (patient != null && patient.getGender() != null) {
-            sb.append("Género: ").append(patient.getGender().toCode()).append("\n");
+            String gender = switch (patient.getGender().toCode()) {
+                case "male"   -> "Masculino";
+                case "female" -> "Feminino";
+                case "other"  -> "Outro";
+                default       -> "Desconhecido";
+            };
+            sb.append("Género: ").append(gender).append("\n");
         }
-        if (patient != null && patient.getBirthDate() != null) {
+
+        // Correcção do formato da data de nascimento
+        if (patient != null && patient.hasBirthDate()) {
+            String birthDateStr = new SimpleDateFormat(DATE_FORMAT)
+                    .format(patient.getBirthDate());
             int age = calculateAge(patient.getBirthDate());
-            sb.append("Data de Nascimento: ").append(patient.getBirthDate())
+            sb.append("Data de Nascimento: ").append(birthDateStr)
               .append(" (").append(age).append(" anos)\n");
         }
 
-        // Identificador hospitalar oficial
         if (patient != null && patient.hasIdentifier()) {
             patient.getIdentifier().stream()
-                    .filter(id -> Identifier.IdentifierUse.OFFICIAL.equals(id.getUse()))
+                    .filter(id -> Identifier.IdentifierUse.OFFICIAL.equals(id.getUse())
+                            || id.getUse() == null)
                     .findFirst()
                     .ifPresent(id -> sb.append("ID Hospital: ")
                             .append(id.getValue()).append("\n"));
@@ -244,8 +219,8 @@ public class PatientSummaryOperation implements IResourceProvider {
             sb.append("  - Nenhuma registada\n");
         } else {
             conditions.forEach(r -> {
-                Condition c     = (Condition) r;
-                String    text  = codeableText(c.getCode());
+                Condition c      = (Condition) r;
+                String    text   = codeableText(c.getCode());
                 String    status = c.hasClinicalStatus()
                         ? " [" + codeableText(c.getClinicalStatus()) + "]" : "";
                 sb.append("  - ").append(text).append(status).append("\n");
@@ -322,7 +297,7 @@ public class PatientSummaryOperation implements IResourceProvider {
     }
 
     // =========================================================
-    // TEXTO ABSTRACTIVO (Inglês)
+    // ABSTRACTIVE SUMMARY — Português + Inglês
     // =========================================================
 
     private String buildAbstractiveText(
@@ -331,16 +306,19 @@ public class PatientSummaryOperation implements IResourceProvider {
             List<Resource> medications, List<Resource> allergies,
             List<Resource> procedures) {
 
+        long labCount = observations.stream()
+                .filter(r -> ((Observation) r).hasValueQuantity()).count();
+
         StringBuilder sb = new StringBuilder();
 
-        sb.append("Patient ").append(patientDisplayName(patient))
+        // ── Versão Portuguesa ──────────────────────────────────
+        sb.append("[PT] ");
+        sb.append("Paciente ").append(patientDisplayName(patient))
           .append(" (ID: ").append(patientId).append(")");
 
-        if (patient != null && patient.getBirthDate() != null) {
-            sb.append(", ").append(calculateAge(patient.getBirthDate()))
-              .append(" years old");
+        if (patient != null && patient.hasBirthDate()) {
+            sb.append(", ").append(calculateAge(patient.getBirthDate())).append(" anos");
         }
-
         sb.append(". ");
 
         if (!conditions.isEmpty()) {
@@ -349,14 +327,14 @@ public class PatientSummaryOperation implements IResourceProvider {
                     .filter(s -> !"Unknown".equals(s))
                     .limit(3)
                     .collect(Collectors.joining(", "));
-            if (!condList.isBlank()) {
-                sb.append("Active conditions: ").append(condList).append(". ");
-            }
+            if (!condList.isBlank())
+                sb.append("Condições activas: ").append(condList).append(". ");
+        } else {
+            sb.append("Sem condições clínicas registadas. ");
         }
 
-        if (!medications.isEmpty()) {
-            sb.append("On ").append(medications.size()).append(" medication(s). ");
-        }
+        if (!medications.isEmpty())
+            sb.append("Com ").append(medications.size()).append(" medicamento(s) activo(s). ");
 
         if (!allergies.isEmpty()) {
             String allergyList = allergies.stream()
@@ -364,21 +342,58 @@ public class PatientSummaryOperation implements IResourceProvider {
                     .filter(s -> !"Unknown".equals(s))
                     .limit(3)
                     .collect(Collectors.joining(", "));
-            if (!allergyList.isBlank()) {
+            if (!allergyList.isBlank())
+                sb.append("Alergias conhecidas: ").append(allergyList).append(". ");
+        }
+
+        if (labCount > 0)
+            sb.append(labCount).append(" resultado(s) laboratorial(ais) recente(s). ");
+
+        if (!procedures.isEmpty())
+            sb.append(procedures.size()).append(" procedimento(s) registado(s).");
+
+        // ── Separador ─────────────────────────────────────────
+        sb.append("\n\n[EN] ");
+
+        // ── Versão Inglesa ────────────────────────────────────
+        sb.append("Patient ").append(patientDisplayName(patient))
+          .append(" (ID: ").append(patientId).append(")");
+
+        if (patient != null && patient.hasBirthDate()) {
+            sb.append(", ").append(calculateAge(patient.getBirthDate())).append(" years old");
+        }
+        sb.append(". ");
+
+        if (!conditions.isEmpty()) {
+            String condList = conditions.stream()
+                    .map(r -> codeableText(((Condition) r).getCode()))
+                    .filter(s -> !"Unknown".equals(s))
+                    .limit(3)
+                    .collect(Collectors.joining(", "));
+            if (!condList.isBlank())
+                sb.append("Active conditions: ").append(condList).append(". ");
+        } else {
+            sb.append("No recorded clinical conditions. ");
+        }
+
+        if (!medications.isEmpty())
+            sb.append("On ").append(medications.size()).append(" medication(s). ");
+
+        if (!allergies.isEmpty()) {
+            String allergyList = allergies.stream()
+                    .map(r -> codeableText(((AllergyIntolerance) r).getCode()))
+                    .filter(s -> !"Unknown".equals(s))
+                    .limit(3)
+                    .collect(Collectors.joining(", "));
+            if (!allergyList.isBlank())
                 sb.append("Known allergies: ").append(allergyList).append(". ");
-            }
         }
 
-        long labCount = observations.stream()
-                .filter(r -> ((Observation) r).hasValueQuantity())
-                .count();
-        if (labCount > 0) {
+        if (labCount > 0)
             sb.append(labCount).append(" recent lab result(s). ");
-        }
 
-        if (!procedures.isEmpty()) {
+        if (!procedures.isEmpty())
             sb.append(procedures.size()).append(" procedure(s) on record.");
-        }
 
         return sb.toString().trim();
     }
@@ -395,7 +410,6 @@ public class PatientSummaryOperation implements IResourceProvider {
 
         Bundle bundle = new Bundle();
         bundle.setType(Bundle.BundleType.COLLECTION);
-
         Meta meta = new Meta();
         meta.setLastUpdated(new Date());
         meta.addProfile(IPS_PROFILE);
@@ -430,14 +444,12 @@ public class PatientSummaryOperation implements IResourceProvider {
 
     private List<Resource> fetchConditions(String patientId, String status) {
         SearchParameterMap params = baseParams(patientId, "subject", null);
-        if (status != null && !status.isBlank()) {
+        if (status != null && !status.isBlank())
             params.add("clinical-status", new TokenParam(status));
-        }
         return executeSearch("Condition", params);
     }
 
-    private List<Resource> fetchObservations(
-            String patientId, String since, int limit) {
+    private List<Resource> fetchObservations(String patientId, String since, int limit) {
         SearchParameterMap params = baseParams(patientId, "subject", since);
         params.setSort(new SortSpec("date", SortOrderEnum.DESC));
         return executeSearch("Observation", params)
@@ -446,9 +458,7 @@ public class PatientSummaryOperation implements IResourceProvider {
 
     private List<Resource> fetchMedications(String patientId) {
         List<Resource> meds = fetchResources("MedicationStatement", patientId, null);
-        if (meds.isEmpty()) {
-            meds = fetchResources("MedicationRequest", patientId, null);
-        }
+        if (meds.isEmpty()) meds = fetchResources("MedicationRequest", patientId, null);
         return meds;
     }
 
@@ -459,59 +469,45 @@ public class PatientSummaryOperation implements IResourceProvider {
         return executeSearch(resourceType, baseParams(patientId, searchParam, since));
     }
 
-    // =========================================================
-    // HELPERS DE PESQUISA
-    // =========================================================
-
     private SearchParameterMap baseParams(
             String patientId, String searchParam, String since) {
-
         SearchParameterMap params = new SearchParameterMap();
         params.setLoadSynchronous(true);
         params.add(searchParam, new ReferenceParam("Patient/" + patientId));
-
         if (since != null && !since.isBlank()) {
             try {
-                Date sinceDate = Date.from(
-                        LocalDate.parse(since)
-                                .atStartOfDay(ZoneOffset.UTC)
-                                .toInstant());
+                Date sinceDate = Date.from(LocalDate.parse(since)
+                        .atStartOfDay(ZoneOffset.UTC).toInstant());
                 params.setLastUpdated(
                         new DateRangeParam().setLowerBoundInclusive(sinceDate));
             } catch (Exception e) {
                 log.warn("[PatientSummary] Parâmetro 'since' inválido: {}", since);
             }
         }
-
         return params;
     }
 
     private List<Resource> executeSearch(
             String resourceType, SearchParameterMap params) {
-
         List<Resource> result = new ArrayList<>();
         try {
             @SuppressWarnings("unchecked")
-            IFhirResourceDao<IBaseResource> dao =
-                    daoRegistry.getResourceDao(resourceType);
+            IFhirResourceDao<IBaseResource> dao = daoRegistry.getResourceDao(resourceType);
             if (dao == null) return result;
-
             IBundleProvider provider = dao.search(params);
             Integer size = provider.size();
             if (size == null || size <= 0) return result;
-
             provider.getResources(0, size).forEach(r -> {
                 if (r instanceof Resource res) result.add(res);
             });
         } catch (Exception e) {
-            log.error("[PatientSummary] Erro ao pesquisar {}: {}",
-                    resourceType, e.getMessage());
+            log.error("[PatientSummary] Erro ao pesquisar {}: {}", resourceType, e.getMessage());
         }
         return result;
     }
 
     // =========================================================
-    // HELPERS DE EXTRACÇÃO DE TEXTO
+    // HELPERS
     // =========================================================
 
     private String codeableText(CodeableConcept concept) {
@@ -528,9 +524,9 @@ public class PatientSummaryOperation implements IResourceProvider {
     private String observationValue(Observation obs) {
         if (obs == null || !obs.hasValue()) return null;
         Type v = obs.getValue();
-        if (v instanceof Quantity   q)  return q.getValue() + " " + q.getUnit();
-        if (v instanceof StringType st) return st.getValue();
-        if (v instanceof BooleanType bt)return bt.getValue().toString();
+        if (v instanceof Quantity    q)  return q.getValue() + " " + q.getUnit();
+        if (v instanceof StringType  st) return st.getValue();
+        if (v instanceof BooleanType bt) return bt.getValue().toString();
         return v.primitiveValue();
     }
 

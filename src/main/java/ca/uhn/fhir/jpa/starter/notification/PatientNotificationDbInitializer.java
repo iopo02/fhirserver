@@ -30,7 +30,7 @@ public class PatientNotificationDbInitializer {
 			}
 
 			try (Statement stmt = conn.createStatement()) {
-				// 1. Create or replace the trigger function
+				// 1. Criar ou substituir a função de trigger
 				String createFunctionSql =
 						"CREATE OR REPLACE FUNCTION notify_patient_created() " +
 						"RETURNS TRIGGER AS $$ " +
@@ -43,18 +43,18 @@ public class PatientNotificationDbInitializer {
 						"$$ LANGUAGE plpgsql;";
 				stmt.execute(createFunctionSql);
 
-				// 2. Drop the trigger if it exists and recreate it to be safe
+				// 2. Recriar o trigger — agora dispara em INSERT e UPDATE
 				String dropTriggerSql = "DROP TRIGGER IF EXISTS trg_patient_created ON hfj_resource;";
 				stmt.execute(dropTriggerSql);
 
 				String createTriggerSql =
 						"CREATE TRIGGER trg_patient_created " +
-						"AFTER INSERT ON hfj_resource " +
+						"AFTER INSERT OR UPDATE ON hfj_resource " + // ← INSERT e UPDATE
 						"FOR EACH ROW " +
 						"EXECUTE FUNCTION notify_patient_created();";
 				stmt.execute(createTriggerSql);
 
-				log.info("PostgreSQL trigger 'trg_patient_created' registered successfully on table 'hfj_resource'.");
+				log.info("PostgreSQL trigger 'trg_patient_created' (INSERT OR UPDATE) registered on 'hfj_resource'.");
 			}
 		} catch (Exception e) {
 			log.error("Failed to initialize PostgreSQL trigger. Please ensure the trigger is created manually.", e);

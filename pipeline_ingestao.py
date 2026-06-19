@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Pipeline de Ingestão FHIR
---------------------------
-Melhorias face à versão original:
-  1. PUT idempotente em vez de POST (RF03 / sem duplicados)
-  2. Bundle transaction por ficheiro (1 chamada HTTP em vez de N)
-  3. ThreadPoolExecutor para processamento paralelo (RF05 / RNF03)
-  4. Retry automático com backoff exponencial (robustez de rede)
-  5. Logging para stdout + ficheiro em simultâneo
+Pipeline de Ingestão FHIR com Auto-Trigger
+-------------------------------------------
+✓ PUT idempotente (sem duplicados)
+✓ Bundle transaction (1 chamada = N recursos)
+✓ ThreadPoolExecutor paralelo
+✓ Retry automático com backoff
+✓ Auto-trigger (monitora data/input continuamente)
+
+Nota: Validação FHIR é feita em fhir.py (build_resources)
 """
 
 import json
@@ -15,6 +16,8 @@ import logging
 import os
 import shutil
 import sys
+import time
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
@@ -22,9 +25,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# ---------------------------------------------------------
-# Conversor FHIR existente (não alterado)
-# ---------------------------------------------------------
+# Conversor FHIR
 from fhir import build_resources
 
 # ==========================================================
@@ -40,6 +41,7 @@ LOG_FILE      = os.path.join(LOG_DIR, "ingesta.log")
 HAPI_URL      = os.getenv("HAPI_URL", "http://localhost:8080/fhir")
 MAX_WORKERS   = int(os.getenv("PIPELINE_WORKERS", "8"))
 REQUEST_TIMEOUT = int(os.getenv("PIPELINE_TIMEOUT", "30"))
+POLL_INTERVAL = int(os.getenv("PIPELINE_POLL", "5"))  # segundos entre verificações
 
 FHIR_HEADERS  = {
     "Content-Type": "application/fhir+json",
@@ -47,7 +49,7 @@ FHIR_HEADERS  = {
 }
 
 # ==========================================================
-# LOGGING — stdout + ficheiro em simultâneo
+# LOGGING — stdout + ficheiro
 # ==========================================================
 def _setup_logging() -> logging.Logger:
     os.makedirs(LOG_DIR, exist_ok=True)
@@ -91,6 +93,62 @@ def _build_session() -> requests.Session:
     return session
 
 _SESSION = _build_session()
+
+
+# ==========================================================
+# AUTO-TRIGGER: Monitora data/input continuamente
+# ==========================================================
+class FilePoller:
+    """
+    Poller simples sem dependências externas.
+    Monitora data/input/ a cada POLL_INTERVAL segundos.
+    """
+    
+    def __init__(self, input_dir: str, poll_interval: int = 5):
+        self.input_dir = Path(input_dir)
+        self.poll_interval = poll_interval
+        self.processed_files = set()
+    
+    def scan_for_new_files(self) -> List[Path]:
+        """Retorna lista de .json novos na pasta"""
+        if not self.input_dir.exists():
+            self.input_dir.mkdir(parents=True, exist_ok=True)
+            return []
+        
+        new_files = []
+        for file in self.input_dir.glob("*.json"):
+            if file.name not in self.processed_files:
+                new_files.append(file)
+                self.processed_files.add(file.name)
+        
+        return new_files
+    
+    def start_watching(self, callback):
+        """
+        Loop de monitorização contínua.
+        Chama callback(filepath) para cada novo arquivo.
+        """
+        log.info(f"🔔 Iniciando auto-trigger em: {self.input_dir}")
+        log.info(f"   Poll interval: {self.poll_interval}s")
+        
+        try:
+            while True:
+                new_files = self.scan_for_new_files()
+                
+                if new_files:
+                    log.info(f"📂 Detectados {len(new_files)} novo(s) arquivo(s)")
+                    for filepath in new_files:
+                        log.info(f"   ➜ {filepath.name}")
+                        try:
+                            callback(str(filepath))
+                        except Exception as e:
+                            log.error(f"   ✗ Erro: {e}")
+                
+                time.sleep(self.poll_interval)
+                
+        except KeyboardInterrupt:
+            log.info("🛑 Auto-trigger interrompido pelo utilizador")
+
 
 
 # ==========================================================
@@ -227,7 +285,7 @@ def ingestar_ficheiro(json_file_path: str, filename: str) -> bool:
         _mover(json_file_path, ERROR_DIR, filename)
         return False
 
-    # --- 2. Conversão para FHIR ---
+    # --- 2. Conversão para FHIR (inclui validação interna) ---
     try:
         fhir_output  = build_resources(data)
         resources    = normalize(fhir_output)
@@ -286,22 +344,20 @@ def _mover(src: str, dest_dir: str, filename: str) -> None:
 # ==========================================================
 # PONTO DE ENTRADA PRINCIPAL
 # ==========================================================
-if __name__ == "__main__":
-    setup_directories()
-
-    # Recolher ficheiros JSON em input/
-    files = [f for f in os.listdir(INPUT_DIR) if f.endswith(".json")]
-
-    if not files:
-        log.info("Nenhum ficheiro JSON encontrado em data/input/. Pipeline terminada.")
-        sys.exit(0)
-
-    log.info(f"{len(files)} ficheiro(s) encontrado(s). Workers: {MAX_WORKERS}")
-
+def process_files(file_list: List[str]) -> Tuple[int, int]:
+    """
+    Processa lista de ficheiros em paralelo.
+    Retorna (sucesso, erros)
+    """
     sucesso = 0
-    erros   = 0
-
-    # --- Processamento paralelo com ThreadPoolExecutor (RF05 / RNF03) ---
+    erros = 0
+    
+    if not file_list:
+        log.info("Nenhum ficheiro para processar")
+        return 0, 0
+    
+    log.info(f"Iniciando processamento de {len(file_list)} ficheiro(s)")
+    
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {
             executor.submit(
@@ -309,7 +365,7 @@ if __name__ == "__main__":
                 os.path.join(INPUT_DIR, filename),
                 filename,
             ): filename
-            for filename in files
+            for filename in file_list
         }
 
         for future in as_completed(futures):
@@ -321,13 +377,51 @@ if __name__ == "__main__":
                 else:
                     erros += 1
             except Exception as exc:
-                # Excepção não capturada dentro da thread
-                log.error(f"Erro inesperado na thread para {filename}: {exc}")
+                log.error(f"Erro inesperado em {filename}: {exc}")
                 erros += 1
+    
+    return sucesso, erros
 
-    # --- Resumo final ---
-    log.info(
-        f"Pipeline concluída — ✓ {sucesso} sucesso(s)  ✗ {erros} erro(s)  "
-        f"de {len(files)} ficheiro(s)"
-    )
-    sys.exit(0 if erros == 0 else 1)
+
+def run_once():
+    """Processa ficheiros que existem em data/input/ neste momento"""
+    setup_directories()
+    
+    files = [f for f in os.listdir(INPUT_DIR) if f.endswith(".json")]
+    if not files:
+        log.info("Nenhum ficheiro JSON em data/input/")
+        return
+    
+    sucesso, erros = process_files(files)
+    log.info(f"Pipeline concluída — ✓ {sucesso} sucesso(s)  ✗ {erros} erro(s)  de {len(files)} ficheiro(s)")
+
+
+def run_with_autotrigger():
+    """Auto-trigger contínuo: monitora data/input/ e processa automaticamente"""
+    setup_directories()
+    
+    poller = FilePoller(INPUT_DIR, poll_interval=POLL_INTERVAL)
+    
+    def on_new_file(filepath: str):
+        """Callback quando novo arquivo é detectado"""
+        filename = os.path.basename(filepath)
+        sucesso, erros = process_files([filename])
+        if sucesso > 0:
+            log.info(f"✓ Auto-trigger sucesso: {filename}")
+        else:
+            log.error(f"✗ Auto-trigger erro: {filename}")
+    
+    poller.start_watching(on_new_file)
+
+
+if __name__ == "__main__":
+    # Suportar --watch para auto-trigger
+    if len(sys.argv) > 1 and sys.argv[1] == "--watch":
+        log.info("=" * 60)
+        log.info("MODO AUTO-TRIGGER ATIVADO")
+        log.info("Monitorando data/input/ continuamente...")
+        log.info("Pressione Ctrl+C para interromper")
+        log.info("=" * 60)
+        run_with_autotrigger()
+    else:
+        run_once()
