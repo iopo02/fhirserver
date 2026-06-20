@@ -1,47 +1,90 @@
 services:
+
   hapi-fhir-jpaserver-start:
-    build: 
-      context: ..  # Isto diz para subir um nível e olhar para a raiz
+    build:
+      context: ..
       dockerfile: docker/Dockerfile
+      target: tomcat
+
     container_name: hapi-fhir-jpaserver-start
     restart: on-failure
+
     environment:
       SPRING_DATASOURCE_URL: "jdbc:postgresql://hapi-fhir-postgres:5432/hapi"
       SPRING_DATASOURCE_USERNAME: "admin"
       SPRING_DATASOURCE_PASSWORD: "admin"
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.postgresql.Driver"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+
     ports:
       - "8080:8080"
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/fhir/metadata"]
       interval: 10s
-      timeout: 5s
-      start_period: 60s
-      retries: 3
+      timeout: 10s
+      start_period: 180s
+      retries: 5
+
     depends_on:
       hapi-fhir-postgres:
         condition: service_healthy
+
   hapi-fhir-postgres:
     image: postgres:16-alpine
+
     container_name: hapi-fhir-postgres
     restart: always
+
     environment:
       POSTGRES_DB: "hapi"
       POSTGRES_USER: "admin"
       POSTGRES_PASSWORD: "admin"
+
     ports:
       - "5432:5432"
+
     healthcheck:
       test: ["CMD-SHELL", "sh -c 'pg_isready -U admin -d hapi' || exit 1"]
       interval: 10s
       timeout: 5s
       start_period: 5s
       retries: 5
+
     volumes:
       - hapi-fhir-postgres:/var/lib/postgresql/data
       - ../configs/postgres.conf:/etc/postgresql/postgresql.conf
+
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+
+  ingestion-pipeline:
+    build:
+      context: ..
+      dockerfile: pipeline/Dockerfile
+
+    container_name: ingestion-pipeline
+    restart: unless-stopped
+
+    depends_on:
+      hapi-fhir-jpaserver-start:
+        condition: service_healthy
+
+    environment:
+      HAPI_URL: "http://hapi-fhir-jpaserver-start:8080/fhir"
+      PIPELINE_WORKERS: "8"
+      PIPELINE_TIMEOUT: "30"
+      PIPELINE_POLL: "5"
+      DB_HOST: "hapi-fhir-postgres"
+      DB_PORT: "5432"
+      DB_NAME: "hapi"
+      DB_USER: "admin"
+      DB_PASS: "admin"
+
+    volumes:
+      - ../data/input:/app/data/input
+      - ../data/processed:/app/data/processed
+      - ../data/error:/app/data/error
+      - ../logs:/app/logs
 
 volumes:
   hapi-fhir-postgres:

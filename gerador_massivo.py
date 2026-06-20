@@ -206,7 +206,7 @@ Evolução {random.choice(['favorável', 'reservada', 'parcialmente favorável']
 # -----------------------------
 # EXECUÇÃO DE CARGA
 # -----------------------------
-def executar_carga(total_pacientes, lote_tamanho=5000):
+def executar_carga(total_pacientes, lote_tamanho=50):
 
     print(f"🚀 A iniciar carga de {total_pacientes} pacientes...")
     inicio = time.time()
@@ -235,4 +235,4 @@ def executar_carga(total_pacientes, lote_tamanho=5000):
 
 
 if __name__ == "__main__":
-    executar_carga(100000)
+    executar_carga(100)
