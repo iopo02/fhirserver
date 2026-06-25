@@ -98,7 +98,7 @@ spring:
     exclude: org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
 
   flyway:
-    enabled: false
+    enabled: true
     baseline-on-migrate: true
     fail-on-missing-locations: false
 
@@ -112,6 +112,17 @@ spring:
     properties:
       hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
       hibernate.search.enabled: false
+
+# -------------------------------------------------------------------------------------
+# JWT Configuration
+# -------------------------------------------------------------------------------------
+jwt:
+  secret: "fhirserver_secret_key_change_in_production_environment_DO_NOT_USE_IN_PRODUCTION"
+  expiration: 86400000 # 24 hours in milliseconds (mantém compatibilidade)
+  access-token-expiration: 900000 # 15 minutos para access token (curto)
+  refresh-token-expiration: 604800000 # 7 dias para refresh token (longo)
+  issuer: "fhirserver" # iss claim
+  audience: "fhirserver-api" # aud claim
 
         # --- Hibernate Search (Lucene/Elasticsearch) ---
         #search:

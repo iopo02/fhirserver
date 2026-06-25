@@ -605,6 +605,264 @@ The `$install` operation is triggered with a POST to `[server]/ImplementationGui
 }
 ```
 
+## JWT Authentication Guide
+
+This HAPI FHIR server includes an enhanced JWT-based authentication implementation with security best practices.
+
+### Security Improvements (2026)
+
+✅ **Access Token + Refresh Token Strategy**
+- Access tokens expire in 15 minutes (short-lived)
+- Refresh tokens expire in 7 days (long-lived)
+- Reduces exposure window from 24h to 15 minutes
+
+✅ **Token Revocation (JTI + Blacklist)**
+- Each token has a unique JTI (JWT ID)
+- Logout immediately revokes tokens
+- Automatic blacklist cleanup every 5 minutes
+
+✅ **OIDC Standard Claims**
+- Claims: `iss`, `aud`, `iat`, `nbf`, `exp`, `jti`
+- Roles as JSON array: `["ADMIN", "MEDICO"]`
+- Compatible with OAuth2/OpenID Connect standards
+
+### Architecture
+
+The JWT authentication system consists of:
+
+- **AuthController** - REST endpoints for login, refresh, logout
+- **JwtTokenProvider** - Generates and validates JWT tokens with JTI
+- **TokenBlacklistService** - Manages token revocation and blacklist
+- **JwtAuthenticationFilter** - Servlet filter validating JWT on each request
+- **SecurityConfig** - Spring configuration for beans and filter registration
+- **TokenResponse** - DTO for login/refresh responses
+
+### Test Credentials
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | ADMIN |
+| doctor | doctor123 | MEDICO |
+
+### Quick Start
+
+#### 1. Build and Deploy
+
+```bash
+cd c:\Users\ruben\Desktop\fhirserver
+docker-compose down
+docker-compose up -d --build
+sleep 45
+```
+
+Verify the server is running:
+```bash
+docker-compose logs hapi-fhir-jpaserver-start --tail=10
+```
+
+#### 2. Login and Get Token Pair
+
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+```
+
+Expected response:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJmaGlyc2VydmVyIiwic3ViIjoiYWRtaW4iLCJleHAiOjE3ODIzOTQzMDIsImp0aSI6ImY2Njc0N2JjLTdjNGYtNDRiNy05NjRjLTFjNDk3ZWJjMDk4MyIsInJvbGVzIjpbIkFETUkiXSwidG9rZW5fdHlwZSI6ImFjY2VzcyJ9...",
+  "refresh_token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJmaGlyc2VydmVyIiwic3ViIjoiYWRtaW4iLCJleHAiOjE3ODI5OTgyMDIsImp0aSI6IjdjMTBjOWUyLTIwNGUtNGY1OS1hNTk0LTQwOGQxMjNhODhjMyIsInJvbGVzIjpbIkFETUkiXSwidG9rZW5fdHlwZSI6InJlZnJlc2gifX...",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "username": "admin",
+  "roles": ["ADMIN"]
+}
+```
+
+#### 3. Use Access Token in FHIR Requests
+
+```bash
+ACCESS_TOKEN="eyJhbGciOiJIUzUxMiJ9..."
+
+curl -X GET http://localhost:8080/fhir/Patient \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+#### 4. Refresh Access Token (Before Expiration)
+
+```bash
+REFRESH_TOKEN="eyJhbGciOiJIUzUxMiJ9..."
+
+curl -X POST http://localhost:8080/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d "{\"refresh_token\":\"$REFRESH_TOKEN\"}"
+```
+
+#### 5. Logout (Revoke Token)
+
+```bash
+curl -X POST http://localhost:8080/auth/logout \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# Response:
+# {"message": "Logged out successfully", "timestamp": 1782393420}
+```
+
+### Token Lifecycle
+
+```
+[LOGIN] → Access Token (15 min) + Refresh Token (7 days)
+    ↓
+[USE API] → Authorization: Bearer <access_token>
+    ↓
+[EXPIRING] → POST /auth/refresh with refresh_token
+    ↓
+[NEW ACCESS] → Get new access_token, use same refresh_token
+    ↓
+[LOGOUT] → POST /auth/logout revokes both tokens (JTI blacklist)
+```
+
+### Role-Based Access Control (RBAC)
+
+| HTTP Method | Endpoint | ADMIN | MEDICO | No Auth |
+|------------|----------|-------|--------|---------|
+| GET | /fhir/* | ✅ | ✅ | ❌ 401 |
+| POST | /fhir/* | ✅ | ✅ | ❌ 401 |
+| PUT | /fhir/* | ✅ | ✅ | ❌ 401 |
+| DELETE | /fhir/* | ✅ | ❌ 403 | ❌ 401 |
+
+### Testing Examples
+
+**Test 1: Request without JWT (401)**
+```bash
+curl -X GET http://localhost:8080/fhir/Patient
+# Response: 401 Unauthorized
+```
+
+**Test 2: ADMIN can DELETE (200/204)**
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' | jq -r '.access_token')
+
+curl -X DELETE http://localhost:8080/fhir/Patient/PATIENT_ID \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Test 3: MEDICO cannot DELETE (403)**
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"doctor","password":"doctor123"}' | jq -r '.access_token')
+
+curl -X DELETE http://localhost:8080/fhir/Patient/PATIENT_ID \
+  -H "Authorization: Bearer $TOKEN"
+# Response: 403 Forbidden
+```
+
+**Test 4: Logout revokes token immediately (401)**
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' | jq -r '.access_token')
+
+# Logout
+curl -X POST http://localhost:8080/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+
+# Try to use revoked token (should fail)
+curl -X GET http://localhost:8080/fhir/Patient \
+  -H "Authorization: Bearer $TOKEN"
+# Response: 401 Unauthorized (token was revoked)
+```
+
+### JWT Configuration
+
+Located in `src/main/resources/application.yaml`:
+
+```yaml
+jwt:
+  secret: fhirserver_secret_key_change_in_production_environment_DO_NOT_USE_IN_PRODUCTION
+  expiration: 86400000  # 24 hours (legacy, kept for compatibility)
+  access-token-expiration: 900000  # 15 minutes
+  refresh-token-expiration: 604800000  # 7 days
+  issuer: fhirserver
+  audience: fhirserver-api
+```
+
+- **Algorithm**: HS512 (HMAC SHA-512)
+- **Access Token Duration**: 15 minutes (900 seconds)
+- **Refresh Token Duration**: 7 days (604,800 seconds)
+- **Header Format**: `Authorization: Bearer <token>`
+- **Claims**: `iss`, `aud`, `sub`, `iat`, `nbf`, `exp`, `jti`, `username`, `roles`, `token_type`
+
+### Testing Scripts
+
+See the following scripts for automated testing:
+
+- **Linux/WSL**: `bash test-jwt-run.sh` - Simple test flow
+- **Linux/WSL (detailed)**: `bash test-jwt-linux.sh` - Full JWT decode and validation
+- **Documentation**: `JWT_TESTING_LINUX.md` - Manual test instructions
+- **Documentation**: `JWT_TESTING_MANUAL.md` - cURL examples for all endpoints
+- **Documentation**: `JWT_IMPROVEMENTS.md` - Implementation details and architecture
+
+### Decoding JWT Tokens
+
+To inspect the token payload:
+
+```bash
+# Function to decode JWT (Bash)
+decode_jwt() {
+  local token=$1
+  echo "$token" | cut -d'.' -f2 | base64 -d | jq .
+}
+
+# Usage
+decode_jwt "$ACCESS_TOKEN"
+```
+
+Expected payload:
+```json
+{
+  "iss": "fhirserver",
+  "aud": "fhirserver-api",
+  "sub": "admin",
+  "iat": 1782393402,
+  "nbf": 1782393403,
+  "exp": 1782394302,
+  "jti": "f66747bc-7c4f-44b7-964c-1c497ebc0983",
+  "username": "admin",
+  "roles": ["ADMIN"],
+  "token_type": "access"
+}
+```
+
+### Security Notes
+
+⚠️ **Production Deployment Checklist**
+- [ ] Change JWT secret to strong random value (use environment variable)
+- [ ] Enable HTTPS/TLS (SSL certificates required)
+- [ ] Implement rate limiting on `/auth/login` endpoint
+- [ ] Use external Identity Provider (Keycloak, Auth0, Azure AD, etc.)
+- [ ] Implement SMART on FHIR (OAuth2/OIDC) for healthcare compliance
+- [ ] Hash passwords with BCrypt instead of plain text
+- [ ] Add audit logging for authentication events
+- [ ] Implement token rotation/refresh strategy
+- [ ] Set appropriate CORS policies
+- [ ] Monitor blacklist size and cleanup performance
+- [ ] Regular security updates for dependencies
+
+⚠️ **This is a simplified academic implementation. For production healthcare systems:**
+- Use dedicated authentication/authorization service
+- Implement SMART on FHIR for HIPAA/HL7 compliance
+- Consider using Spring Security OAuth2 with external provider
+- Enable encryption at rest and in transit
+- Implement comprehensive audit trails
+- Regular penetration testing and security audits
+
+
+
 ## Enable OpenTelemetry auto-instrumentation
 
 The container image includes the [OpenTelemetry Java auto-instrumentation](https://github.com/open-telemetry/opentelemetry-java-instrumentation)
