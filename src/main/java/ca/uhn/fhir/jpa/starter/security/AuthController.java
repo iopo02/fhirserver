@@ -3,12 +3,15 @@ package ca.uhn.fhir.jpa.starter.security;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Authentication Controller - Simplified for demonstration
@@ -161,6 +164,74 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("Logout failed", System.currentTimeMillis()));
         }
+    }
+
+    /**
+     * Get current user info - requires valid JWT token
+     * 
+     * GET /auth/me
+     * Header: Authorization: Bearer <access_token>
+     * 
+     * Returns user data (id, username, email, roles)
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ErrorResponse("No authenticated user", System.currentTimeMillis()));
+            }
+
+            String username = authentication.getName();
+            UserCredential user = USERS.get(username);
+
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("User not found", System.currentTimeMillis()));
+            }
+
+            // Build user response with ID based on username
+            Map<String, Object> userResponse = new HashMap<>();
+            userResponse.put("id", generateUserId(username));
+            userResponse.put("username", user.getUsername());
+            userResponse.put("email", generateUserEmail(username));
+            userResponse.put("roles", user.getRoles());
+            userResponse.put("timestamp", System.currentTimeMillis());
+
+            log.debug("User info retrieved for: {}", username);
+            return ResponseEntity.ok(userResponse);
+
+        } catch (Exception e) {
+            log.error("Error retrieving user info", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse("Error retrieving user info", System.currentTimeMillis()));
+        }
+    }
+
+    /**
+     * Helper method to generate a consistent user ID based on username
+     */
+    private String generateUserId(String username) {
+        // In production, load from database
+        return switch (username) {
+            case "admin" -> "123";
+            case "doctor" -> "456";
+            default -> String.valueOf(username.hashCode());
+        };
+    }
+
+    /**
+     * Helper method to generate user email based on username
+     */
+    private String generateUserEmail(String username) {
+        // In production, load from database
+        return switch (username) {
+            case "admin" -> "admin@fhirserver.com";
+            case "doctor" -> "doctor@fhirserver.com";
+            default -> username + "@fhirserver.com";
+        };
     }
 
     /**

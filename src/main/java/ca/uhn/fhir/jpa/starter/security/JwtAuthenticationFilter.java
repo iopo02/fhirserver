@@ -20,8 +20,12 @@ import java.util.stream.Collectors;
 /**
  * JWT Authentication Filter - validates JWT token and sets Spring Security context
  * 
- * Simplified version that does not depend on a database user lookup.
- * Trust the JWT claims directly.
+ * Funciona em endpoints protegidos (/fhir/*, /auth/*, /actuator/*)
+ * Não filtra recursos estáticos (HTML, CSS, JS) ou raiz (/)
+ * 
+ * - Se token é válido: autentica o utilizador
+ * - Se token é inválido/revogado e endpoint requer auth: retorna 401
+ * - Se token é válido mas não autorizado para ação: retorna 403 (via @PreAuthorize)
  */
 @Component
 @Slf4j
@@ -39,29 +43,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String token = extractTokenFromRequest(request);
 
-            if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
+            if (StringUtils.hasText(token)) {
+                // Token foi fornecido — validar obrigatoriamente
+                if (!jwtTokenProvider.validateToken(token)) {
+                    // Token inválido, expirado ou revogado
+                    log.warn("Invalid or revoked JWT token from: {}", request.getRemoteAddr());
+                    sendUnauthorized(response, "Invalid or revoked token");
+                    return;
+                }
+
+                // Token válido — extrair claims e autenticar
                 String username = jwtTokenProvider.getUsernameFromToken(token);
                 Set<String> roles = jwtTokenProvider.getRolesFromToken(token);
 
                 if (StringUtils.hasText(username)) {
-                    // Convert roles to Spring Security authorities
+                    // Converter roles para Spring Security authorities
                     Set<SimpleGrantedAuthority> authorities = roles.stream()
                         .filter(role -> role != null && !role.isEmpty())
                         .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                         .collect(Collectors.toSet());
 
-                    // Set authentication
+                    // Definir autenticação no contexto
                     UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(username, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                    log.debug("JWT authentication set for user: {} with roles: {}", username, roles);
+                    log.debug("JWT authenticated: user={}, roles={}", username, roles);
                 } else {
-                    log.warn("No username found in JWT token");
+                    log.warn("No username in JWT token");
+                    sendUnauthorized(response, "Invalid token: no username");
+                    return;
                 }
             }
+            // Se não há token, continua sem autenticação
+            // Spring Security com @PreAuthorize vai retornar 403 se necessário
+
         } catch (Exception ex) {
-            log.error("Error processing JWT authentication: {}", ex.getMessage());
+            log.error("JWT filter error: {}", ex.getMessage());
+            sendUnauthorized(response, "Authentication error");
+            return;
         }
 
         filterChain.doFilter(request, response);
@@ -73,5 +93,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return authHeader.substring(BEARER_PREFIX.length());
         }
         return null;
+    }
+
+    private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"" + message + "\",\"status\":401}");
+    }
+
+    /**
+     * Aplica este filtro apenas em endpoints protegidos, não em recursos estáticos
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        
+        // Não filtrar raiz, recursos estáticos, ou endpoints públicos
+        return path.equals("/") ||
+               path.startsWith("/css/") ||
+               path.startsWith("/js/") ||
+               path.startsWith("/images/") ||
+               path.startsWith("/fonts/") ||
+               path.startsWith("/static/") ||
+               path.startsWith("/public/") ||
+               path.equals("/auth/login") ||
+               path.equals("/auth/refresh") ||
+               path.equals("/auth/logout") ||
+               path.startsWith("/webjars/") ||
+               path.equals("/health");
     }
 }

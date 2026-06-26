@@ -6,7 +6,7 @@ Note that this project is specifically intended for end users of the HAPI FHIR J
 
 While this project shows how you can use many parts of the HAPI FHIR framework there are a set of features which you should be aware of are missing or something you need to supply yourself or get professional support ahead of using it directly in production:
 
-1) The service comes with no security implementation. See how it can be done [here](https://hapifhir.io/hapi-fhir/docs/security/introduction.html)
+1) ✅ The service now includes JWT-based security (Beta). See [Security & Authentication](#security--authentication) below.
 2) The service comes with no enterprise logging. See how it can be done [here](https://hapifhir.io/hapi-fhir/docs/security/balp_interceptor.html)
 3) The internal topic cache used by subscriptions in HAPI FHIR are not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-jpaserver-subscription/src/main/java/ca/uhn/fhir/jpa/topic/ActiveSubscriptionTopicCache.java)
 4) The internal message broker channel in HAPI FHIR is not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-storage/src/main/java/ca/uhn/fhir/jpa/subscription/channel/api/IChannelFactory.java). This impacts the use of modules listed [here](https://smilecdr.com/docs/installation/message_broker.html#modules-dependent-on-message-brokers)
@@ -25,6 +25,126 @@ In order to use this sample, you should have:
 
 ### or
  - Docker, as the entire project can be built using multistage docker (with both JDK and maven wrapped in docker) or used directly from [Docker Hub](https://hub.docker.com/r/hapiproject/hapi)
+
+## Security & Authentication
+
+This FHIR server includes JWT-based security with role-based access control (RBAC). All FHIR endpoints require authentication.
+
+### Authentication Endpoints
+
+#### 1. Login (Get Tokens)
+```bash
+POST /auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+**Response:**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "tokenType": "Bearer",
+  "expiresIn": 900,
+  "username": "admin",
+  "roles": ["ADMIN"]
+}
+```
+
+**Test Credentials:**
+- `admin` / `admin123` → Role: **ADMIN** (full access)
+- `doctor` / `doctor123` → Role: **MEDICO** (read/write, no delete)
+
+#### 2. Get Current User Info (NEW)
+```bash
+GET /auth/me
+Authorization: Bearer <accessToken>
+```
+
+**Response:**
+```json
+{
+  "id": "123",
+  "username": "admin",
+  "email": "admin@fhirserver.com",
+  "roles": ["ADMIN"],
+  "timestamp": 1720046400000
+}
+```
+
+#### 3. Refresh Access Token
+```bash
+POST /auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "<refreshToken>"
+}
+```
+
+#### 4. Logout (Revoke Token)
+```bash
+POST /auth/logout
+Authorization: Bearer <accessToken>
+```
+
+### Authorization Rules
+
+| Endpoint | GET | POST | PUT | DELETE |
+|----------|-----|------|-----|--------|
+| `/fhir/**` | ADMIN, MEDICO | ADMIN, MEDICO | ADMIN, MEDICO | ADMIN only |
+| `/auth/me` | Authenticated | - | - | - |
+| `/auth/logout` | - | Authenticated | - | - |
+
+### Example: Query FHIR API with JWT
+
+```bash
+# 1. Login
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  | jq -r '.accessToken')
+
+# 2. Use token to access FHIR
+curl -X GET http://localhost:8080/fhir/Patient \
+  -H "Authorization: Bearer $TOKEN"
+
+# 3. Get user info
+curl -X GET http://localhost:8080/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+
+# 4. Logout (revoke token)
+curl -X POST http://localhost:8080/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### JWT Token Details
+
+- **Access Token**: 15 minutes expiration (short-lived)
+- **Refresh Token**: 7 days expiration (long-lived)
+- **Algorithm**: HS256 with configurable secret key
+- **Claims**: username, roles, jti (JWT ID for revocation), iss, aud, iat, nbf
+
+### Configuration
+
+JWT settings can be configured in `src/main/resources/application.yaml`:
+
+```yaml
+jwt:
+  secret: your-secret-key-change-in-production
+  access-token-expiration: 900000      # 15 minutes in milliseconds
+  refresh-token-expiration: 604800000  # 7 days in milliseconds
+  issuer: fhirserver
+  audience: fhirserver-api
+```
+
+⚠️ **Important**: Change the `jwt.secret` in production to a strong, randomly generated value.
+
+---
 
 ## Running via [Docker Hub](https://hub.docker.com/r/hapiproject/hapi)
 
