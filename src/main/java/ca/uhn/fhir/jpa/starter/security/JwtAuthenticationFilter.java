@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -17,16 +18,6 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * JWT Authentication Filter - validates JWT token and sets Spring Security context
- * 
- * Funciona em endpoints protegidos (/fhir/*, /auth/*, /actuator/*)
- * Não filtra recursos estáticos (HTML, CSS, JS) ou raiz (/)
- * 
- * - Se token é válido: autentica o utilizador
- * - Se token é inválido/revogado e endpoint requer auth: retorna 401
- * - Se token é válido mas não autorizado para ação: retorna 403 (via @PreAuthorize)
- */
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -40,54 +31,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        try {
-            String token = extractTokenFromRequest(request);
 
-            if (StringUtils.hasText(token)) {
-                // Token foi fornecido — validar obrigatoriamente
-                if (!jwtTokenProvider.validateToken(token)) {
-                    // Token inválido, expirado ou revogado
-                    log.warn("Invalid or revoked JWT token from: {}", request.getRemoteAddr());
-                    sendUnauthorized(response, "Invalid or revoked token");
+        String token = getJwtFromRequest(request);
+
+        if (StringUtils.hasText(token)) {
+            // 1. Valida a assinatura, tempo de expiração e se está na Blacklist
+            if (jwtTokenProvider.validateToken(token)) {
+                
+                // 2. CORREÇÃO DA INVERSÃO: Bloquear se for um Refresh Token a tentar aceder à API
+                String tokenType = jwtTokenProvider.getTokenTypeFromToken(token);
+                if ("refresh".equalsIgnoreCase(tokenType)) {
+                    sendUnauthorized(response, "Este token é um Refresh Token e não pode ser utilizado para aceder à API. Use o Access Token.");
                     return;
                 }
 
-                // Token válido — extrair claims e autenticar
                 String username = jwtTokenProvider.getUsernameFromToken(token);
                 Set<String> roles = jwtTokenProvider.getRolesFromToken(token);
 
-                if (StringUtils.hasText(username)) {
-                    // Converter roles para Spring Security authorities
-                    Set<SimpleGrantedAuthority> authorities = roles.stream()
-                        .filter(role -> role != null && !role.isEmpty())
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                        .collect(Collectors.toSet());
+                if (username != null) {
+                    // Transforma as Strings de roles ("ADMIN", "MEDICO") em GrantedAuthority ("ROLE_ADMIN", "ROLE_MEDICO")
+                    var authorities = roles.stream()
+                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                            .collect(Collectors.toList());
 
-                    // Definir autenticação no contexto
-                    UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(username, null, authorities);
+                    UsernamePasswordAuthenticationToken authentication = 
+                            new UsernamePasswordAuthenticationToken(username, null, authorities);
+                    
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-
-                    log.debug("JWT authenticated: user={}, roles={}", username, roles);
-                } else {
-                    log.warn("No username in JWT token");
-                    sendUnauthorized(response, "Invalid token: no username");
-                    return;
                 }
+            } else {
+                sendUnauthorized(response, "O Token JWT está expirado, é inválido ou foi revogado.");
+                return;
             }
-            // Se não há token, continua sem autenticação
-            // Spring Security com @PreAuthorize vai retornar 403 se necessário
-
-        } catch (Exception ex) {
-            log.error("JWT filter error: {}", ex.getMessage());
-            sendUnauthorized(response, "Authentication error");
-            return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private String extractTokenFromRequest(HttpServletRequest request) {
+    private String getJwtFromRequest(HttpServletRequest request) {
         String authHeader = request.getHeader(AUTHORIZATION_HEADER);
         if (StringUtils.hasText(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
             return authHeader.substring(BEARER_PREFIX.length());
@@ -98,17 +80,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
-        response.getWriter().write("{\"error\":\"" + message + "\",\"status\":401}");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("{\"success\":false,\"status\":401,\"error\":\"Não Autorizado\",\"message\":\"" + message + "\"}");
     }
 
-    /**
-     * Aplica este filtro apenas em endpoints protegidos, não em recursos estáticos
-     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
-        
-        // Não filtrar raiz, recursos estáticos, ou endpoints públicos
         return path.equals("/") ||
                path.startsWith("/css/") ||
                path.startsWith("/js/") ||

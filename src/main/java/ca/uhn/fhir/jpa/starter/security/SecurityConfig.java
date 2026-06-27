@@ -1,7 +1,5 @@
 package ca.uhn.fhir.jpa.starter.security;
 
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -10,40 +8,22 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+//import org.springframework.security.web.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 
-/**
- * Minimal security configuration for JWT-based authentication.
- * 
- * - JWT filter é registado manualmente para proteger /fhir/*, /auth/*,
- * /actuator/*
- * - @EnableMethodSecurity permite usar @PreAuthorize para RBAC granular
- * - Recursos estáticos não são filtrados (vêem o filtro mas a função
- * shouldNotFilter exclui-os)
- * 
- * Test Credentials:
- * - admin / admin123 (role: ADMIN)
- * - doctor / doctor123 (role: MEDICO)
- * 
- * RBAC Rules:
- * - GET /fhir/* : ADMIN e MEDICO
- * - POST /fhir/* : ADMIN e MEDICO
- * - DELETE /fhir/* : ADMIN apenas
- * - PUT /fhir/* : ADMIN e MEDICO
- * 
- * This is a simplified, academic implementation.
- * In production, use an external Identity Provider (Keycloak, OAuth2/OIDC,
- * SMART on FHIR).
- */
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtTokenProvider jwtTokenProvider;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(JwtTokenProvider jwtTokenProvider, JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtTokenProvider = jwtTokenProvider;
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
@@ -52,57 +32,68 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * Registar JWT filter apenas em endpoints protegidos
-     * O filtro tem shouldNotFilter() para excluir recursos estáticos e login
-     * público
-     */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // 1. ATIVAR CORS COM CONFIGURAÇÃO EXPLÍCITA
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                
+                // 2. CORREÇÃO DO 403/401 EM HTML -> FORMATAR COMO JSON
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("{\"success\":false,\"status\":401,\"error\":\"Não Autorizado\",\"message\":\"" + authException.getMessage() + "\",\"path\":\"" + request.getRequestURI() + "\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.getWriter().write("{\"success\":false,\"status\":403,\"error\":\"Proibido\",\"message\":\"Acesso negado: não tem permissões para este recurso.\",\"path\":\"" + request.getRequestURI() + "\"}");
+                        })
+                )
 
                 .authorizeHttpRequests(auth -> auth
-
-                        // Public endpoints - no authentication required
                         .requestMatchers(
-                                new AntPathRequestMatcher("/fhir/metadata"),
+                                new AntPathRequestMatcher("/"),
                                 new AntPathRequestMatcher("/auth/login"),
                                 new AntPathRequestMatcher("/auth/refresh"),
+                                new AntPathRequestMatcher("/health"),
                                 new AntPathRequestMatcher("/actuator/health/**"),
                                 new AntPathRequestMatcher("/fhir/swagger-ui/**"),
-                                new AntPathRequestMatcher("/fhir/api-docs/**"))
+                                new AntPathRequestMatcher("/fhir/api-docs/**"),
+                                new AntPathRequestMatcher("/fhir/metadata/**"))
                         .permitAll()
-
-                        // Protected admin endpoints - require ADMIN role
-                        .requestMatchers(new AntPathRequestMatcher("/admin/**"))
-                        .hasRole("ADMIN")
-
-                        // Protected FHIR endpoints - require ADMIN or MEDICO role
-                        .requestMatchers(new AntPathRequestMatcher("/fhir/**"))
-                        .hasAnyRole("ADMIN", "MEDICO")
-
-                        // Protected auth endpoints - require authentication
+                        .requestMatchers(new AntPathRequestMatcher("/admin/**")).hasRole("ADMIN")
+                        .requestMatchers(new AntPathRequestMatcher("/fhir/**")).hasAnyRole("ADMIN", "MEDICO")
                         .requestMatchers(
                                 new AntPathRequestMatcher("/auth/me"),
                                 new AntPathRequestMatcher("/auth/logout"))
                         .authenticated()
-
-                        // All other requests require authentication
-                        .anyRequest()
-                        .authenticated())
+                        .anyRequest().authenticated())
 
                 .httpBasic(httpBasic -> httpBasic.disable())
-
                 .formLogin(form -> form.disable())
-
-                .addFilterBefore(
-                        jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // 3. FONTE DE CONFIGURAÇÃO DO CORS
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("*")); // Em produção, define a URL exata do teu Frontend
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
+        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowCredentials(false); // Deve ser false se usares "*" em AllowedOrigins
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

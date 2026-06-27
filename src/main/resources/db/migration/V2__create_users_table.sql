@@ -32,8 +32,8 @@ CREATE INDEX idx_user_roles_role ON user_roles(role);
 
 -- Insert default admin user (password: admin123 -> BCrypt hashed)
 -- Generated with: bcrypt("admin123") = $2a$10$7ZP1k92DCqsKjZJfFXMH/.qLGCFZEzJpCXJ7BVlKjqHmfr5W4mzNS
-INSERT INTO users (username, email, password, first_name, last_name, active, locked, created_by, updated_by)
-VALUES ('admin', 'admin@fhirserver.com', '$2a$10$7ZP1k92DCqsKjZJfFXMH/.qLGCFZEzJpCXJ7BVlKjqHmfr5W4mzNS', 'Admin', 'User', true, false, 'SYSTEM', 'SYSTEM')
+INSERT INTO users (username, email, password, first_name, last_name, active, locked, created_at, updated_at, created_by, updated_by)
+VALUES ('admin', 'admin@fhirserver.com', '$2a$10$7ZP1k92DCqsKjZJfFXMH/.qLGCFZEzJpCXJ7BVlKjqHmfr5W4mzNS', 'Admin', 'User', true, false, NOW(), NOW(), 'SYSTEM', 'SYSTEM')
 ON CONFLICT (username) DO NOTHING;
 
 -- Add admin role to default admin user
@@ -43,8 +43,8 @@ ON CONFLICT DO NOTHING;
 
 -- Insert default doctor user (password: doctor123 -> BCrypt hashed)
 -- Generated with: bcrypt("doctor123") = $2a$10$Qj/5M5kKzN2d.9KK/d5Duu3JG.4KxZF3JxZqVJvOKD9Iyk6BXJJKm
-INSERT INTO users (username, email, password, first_name, last_name, active, locked, created_by, updated_by)
-VALUES ('doctor', 'doctor@fhirserver.com', '$2a$10$Qj/5M5kKzN2d.9KK/d5Duu3JG.4KxZF3JxZqVJvOKD9Iyk6BXJJKm', 'Doctor', 'User', true, false, 'SYSTEM', 'SYSTEM')
+INSERT INTO users (username, email, password, first_name, last_name, active, locked, created_at, updated_at, created_by, updated_by)
+VALUES ('doctor', 'doctor@fhirserver.com', '$2a$10$Qj/5M5kKzN2d.9KK/d5Duu3JG.4KxZF3JxZqVJvOKD9Iyk6BXJJKm', 'Doctor', 'User', true, false, NOW(), NOW(), 'SYSTEM', 'SYSTEM')
 ON CONFLICT (username) DO NOTHING;
 
 -- Add medico role to default doctor user
