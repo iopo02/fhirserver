@@ -5,27 +5,23 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Authentication Controller - Simplified for demonstration
  * 
  * Provides endpoints for:
- * - POST /login - Login with username/password, returns access + refresh tokens
- * - POST /refresh - Renew access token using refresh token
- * - POST /logout - Revoke access token (logout)
+ * - POST /auth/login - Login with username/password, returns access + refresh tokens
+ * - POST /auth/refresh - Renew access token using refresh token
+ * - POST /auth/logout - Revoke access token (logout)
+ * - GET /auth/me - Get current user info
  * 
- * For academic purposes. In production, use an external Identity Provider.
- * 
- * Test credentials:
- * - admin / admin123 (role: ADMIN)
- * - doctor / doctor123 (role: MEDICO)
+ * Uses UserService for user validation and management.
+ * In production, use an external Identity Provider (Keycloak, OAuth2/OIDC).
  */
 @Slf4j
 @RestController
@@ -33,20 +29,11 @@ import java.util.stream.Collectors;
 public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final PasswordEncoder passwordEncoder;
+    private final UserService userService;
 
-    // Hardcoded users for demonstration
-    private static final Map<String, UserCredential> USERS = new HashMap<>();
-    
-    static {
-        // In production, load from database or identity provider
-        USERS.put("admin", new UserCredential("admin", "admin123", Set.of("ADMIN")));
-        USERS.put("doctor", new UserCredential("doctor", "doctor123", Set.of("MEDICO")));
-    }
-
-    public AuthController(JwtTokenProvider jwtTokenProvider, PasswordEncoder passwordEncoder) {
+    public AuthController(JwtTokenProvider jwtTokenProvider, UserService userService) {
         this.jwtTokenProvider = jwtTokenProvider;
-        this.passwordEncoder = passwordEncoder;
+        this.userService = userService;
     }
 
     @PostMapping("/login")
@@ -54,20 +41,16 @@ public class AuthController {
         try {
             log.info("Login attempt for user: {}", loginRequest.getUsername());
 
-            // Find user
-            UserCredential user = USERS.get(loginRequest.getUsername());
-            if (user == null) {
-                log.warn("User not found: {}", loginRequest.getUsername());
+            // Validate credentials using UserService
+            if (!userService.validateCredentials(loginRequest.getUsername(), loginRequest.getPassword())) {
+                log.warn("Invalid credentials for user: {}", loginRequest.getUsername());
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
             }
 
-            // Verify password (for demo, simple comparison; in production use BCrypt)
-            if (!user.getPassword().equals(loginRequest.getPassword())) {
-                log.warn("Invalid password for user: {}", loginRequest.getUsername());
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
-            }
+            // Get user from database
+            User user = userService.getUserByUsername(loginRequest.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
             // Generate access + refresh tokens
             TokenResponse tokenPair = jwtTokenProvider.generateTokenPair(
@@ -75,7 +58,7 @@ public class AuthController {
                 user.getRoles()
             );
 
-            log.info("Login successful for user: {} with roles: {}", loginRequest.getUsername(), user.getRoles());
+            log.info("Login successful for user: {} with roles: {}", user.getUsername(), user.getRoles());
 
             return ResponseEntity.ok(tokenPair);
 
@@ -185,19 +168,19 @@ public class AuthController {
             }
 
             String username = authentication.getName();
-            UserCredential user = USERS.get(username);
+            User user = userService.getUserByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-            if (user == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new ErrorResponse("User not found", System.currentTimeMillis()));
-            }
-
-            // Build user response with ID based on username
+            // Build user response
             Map<String, Object> userResponse = new HashMap<>();
-            userResponse.put("id", generateUserId(username));
+            userResponse.put("id", user.getId());
             userResponse.put("username", user.getUsername());
-            userResponse.put("email", generateUserEmail(username));
+            userResponse.put("email", user.getEmail());
+            userResponse.put("firstName", user.getFirstName());
+            userResponse.put("lastName", user.getLastName());
             userResponse.put("roles", user.getRoles());
+            userResponse.put("active", user.getActive());
+            userResponse.put("locked", user.getLocked());
             userResponse.put("timestamp", System.currentTimeMillis());
 
             log.debug("User info retrieved for: {}", username);
@@ -208,49 +191,6 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("Error retrieving user info", System.currentTimeMillis()));
         }
-    }
-
-    /**
-     * Helper method to generate a consistent user ID based on username
-     */
-    private String generateUserId(String username) {
-        // In production, load from database
-        return switch (username) {
-            case "admin" -> "123";
-            case "doctor" -> "456";
-            default -> String.valueOf(username.hashCode());
-        };
-    }
-
-    /**
-     * Helper method to generate user email based on username
-     */
-    private String generateUserEmail(String username) {
-        // In production, load from database
-        return switch (username) {
-            case "admin" -> "admin@fhirserver.com";
-            case "doctor" -> "doctor@fhirserver.com";
-            default -> username + "@fhirserver.com";
-        };
-    }
-
-    /**
-     * Simple user credential holder
-     */
-    private static class UserCredential {
-        private final String username;
-        private final String password;
-        private final Set<String> roles;
-
-        public UserCredential(String username, String password, Set<String> roles) {
-            this.username = username;
-            this.password = password;
-            this.roles = roles;
-        }
-
-        public String getUsername() { return username; }
-        public String getPassword() { return password; }
-        public Set<String> getRoles() { return roles; }
     }
 
     /**
@@ -271,41 +211,6 @@ public class AuthController {
 
         public String getPassword() { return password; }
         public void setPassword(String password) { this.password = password; }
-    }
-
-    /**
-     * DTO for login responses
-     */
-    public static class LoginResponse {
-        private String username;
-        private String token;
-        private String tokenType;
-        private Set<String> roles;
-        private long expiresIn;
-
-        public LoginResponse(String username, String token, String tokenType, 
-                            Set<String> roles, long expiresIn) {
-            this.username = username;
-            this.token = token;
-            this.tokenType = tokenType;
-            this.roles = roles;
-            this.expiresIn = expiresIn;
-        }
-
-        public String getUsername() { return username; }
-        public void setUsername(String username) { this.username = username; }
-
-        public String getToken() { return token; }
-        public void setToken(String token) { this.token = token; }
-
-        public String getTokenType() { return tokenType; }
-        public void setTokenType(String tokenType) { this.tokenType = tokenType; }
-
-        public Set<String> getRoles() { return roles; }
-        public void setRoles(Set<String> roles) { this.roles = roles; }
-
-        public long getExpiresIn() { return expiresIn; }
-        public void setExpiresIn(long expiresIn) { this.expiresIn = expiresIn; }
     }
 
     /**

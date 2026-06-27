@@ -77,6 +77,10 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/fhir/api-docs/**"))
                         .permitAll()
 
+                        // Protected admin endpoints - require ADMIN role
+                        .requestMatchers(new AntPathRequestMatcher("/admin/**"))
+                        .hasRole("ADMIN")
+
                         // Protected FHIR endpoints - require ADMIN or MEDICO role
                         .requestMatchers(new AntPathRequestMatcher("/fhir/**"))
                         .hasAnyRole("ADMIN", "MEDICO")

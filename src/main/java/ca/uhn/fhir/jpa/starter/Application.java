@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration;
 import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
@@ -27,39 +28,40 @@ import org.springframework.context.annotation.Import;
 @ServletComponentScan(basePackageClasses = {RestfulServer.class})
 @SpringBootApplication(exclude = {ThymeleafAutoConfiguration.class})
 @Import({
-	StarterCrR4Config.class,
-	StarterCrDstu3Config.class,
-	StarterCdsHooksConfig.class,
-	SubscriptionSubmitterConfig.class,
-	SubscriptionProcessorConfig.class,
-	SubscriptionChannelConfig.class,
-	WebsocketDispatcherConfig.class,
-	MdmConfig.class,
-	JpaBatch2Config.class,
-	Batch2JobsConfig.class
+    StarterCrR4Config.class,
+    StarterCrDstu3Config.class,
+    StarterCdsHooksConfig.class,
+    SubscriptionSubmitterConfig.class,
+    SubscriptionProcessorConfig.class,
+    SubscriptionChannelConfig.class,
+    WebsocketDispatcherConfig.class,
+    MdmConfig.class,
+    JpaBatch2Config.class,
+    Batch2JobsConfig.class
+})
+// Mantemos o EntityScan para o Hibernate mapear a tabela users
+@EntityScan(basePackages = {
+    "ca.uhn.fhir.jpa.model.entity", 
+    "ca.uhn.fhir.jpa.entity"
 })
 public class Application extends SpringBootServletInitializer {
 
-	public static void main(String[] args) {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
 
-		SpringApplication.run(Application.class, args);
+    @Autowired
+    AutowireCapableBeanFactory beanFactory;
 
-		// Server is now accessible at e.g. http://localhost:8080/fhir/metadata
-		// UI is now accessible at http://localhost:8080/
-	}
+    @Bean
+    @Conditional(OnEitherVersion.class)
+    public ServletRegistrationBean hapiServletRegistration(RestfulServer restfulServer) {
+        ServletRegistrationBean servletRegistrationBean = new ServletRegistrationBean();
+        beanFactory.autowireBean(restfulServer);
+        servletRegistrationBean.setServlet(restfulServer);
+        servletRegistrationBean.addUrlMappings("/fhir/*");
+        servletRegistrationBean.setLoadOnStartup(1);
 
-	@Autowired
-	AutowireCapableBeanFactory beanFactory;
-
-	@Bean
-	@Conditional(OnEitherVersion.class)
-	public ServletRegistrationBean hapiServletRegistration(RestfulServer restfulServer) {
-		ServletRegistrationBean servletRegistrationBean = new ServletRegistrationBean();
-		beanFactory.autowireBean(restfulServer);
-		servletRegistrationBean.setServlet(restfulServer);
-		servletRegistrationBean.addUrlMappings("/fhir/*");
-		servletRegistrationBean.setLoadOnStartup(1);
-
-		return servletRegistrationBean;
-	}
+        return servletRegistrationBean;
+    }
 }
