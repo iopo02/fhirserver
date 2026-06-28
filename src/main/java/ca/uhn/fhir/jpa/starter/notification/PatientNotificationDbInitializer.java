@@ -2,10 +2,11 @@ package ca.uhn.fhir.jpa.starter.notification;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
-import jakarta.annotation.PostConstruct;
 import java.sql.Connection;
 import java.sql.Statement;
 
@@ -19,7 +20,7 @@ public class PatientNotificationDbInitializer {
 		this.dataSource = dataSource;
 	}
 
-	@PostConstruct
+	@EventListener(ApplicationReadyEvent.class)
 	public void init() {
 		log.info("Initializing PostgreSQL LISTEN/NOTIFY trigger for Patient resources...");
 		try (Connection conn = dataSource.getConnection()) {
@@ -43,13 +44,13 @@ public class PatientNotificationDbInitializer {
 						"$$ LANGUAGE plpgsql;";
 				stmt.execute(createFunctionSql);
 
-				// 2. Recriar o trigger — agora dispara em INSERT e UPDATE
+				// 2. Recriar o trigger — dispara em INSERT e UPDATE
 				String dropTriggerSql = "DROP TRIGGER IF EXISTS trg_patient_created ON hfj_resource;";
 				stmt.execute(dropTriggerSql);
 
 				String createTriggerSql =
 						"CREATE TRIGGER trg_patient_created " +
-						"AFTER INSERT OR UPDATE ON hfj_resource " + // ← INSERT e UPDATE
+						"AFTER INSERT OR UPDATE ON hfj_resource " +
 						"FOR EACH ROW " +
 						"EXECUTE FUNCTION notify_patient_created();";
 				stmt.execute(createTriggerSql);

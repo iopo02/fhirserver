@@ -228,22 +228,22 @@ public class UserService {
      * @return true if credentials are valid and user is active/unlocked
      */
     public boolean validateCredentials(String username, String password) {
-        Optional<User> user = userRepository.findByUsername(username);
+        log.info("Tentativa de login para o utilizador: {}", username);
         
+        Optional<User> user = userRepository.findByUsername(username);
         if (user.isEmpty()) {
             return false;
         }
         
         User u = user.get();
-        
-        // Check if user is active and not locked
+
         if (!u.getActive() || u.getLocked()) {
-            log.warn("Login attempt for inactive/locked user: {}", username);
+            log.warn("Utilizador bloqueado ou inativo: {}", username);
             return false;
         }
-        
-        // Check password
-        return passwordEncoder.matches(password, u.getPassword());
+
+        // Deixar apenas a comparação limpa e segura usando o .trim() por precaução
+        return passwordEncoder.matches(password.trim(), u.getPassword());
     }
     
     /**

@@ -24,6 +24,7 @@ import org.springframework.boot.web.servlet.support.SpringBootServletInitializer
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @ServletComponentScan(basePackageClasses = {RestfulServer.class})
 @SpringBootApplication(exclude = {ThymeleafAutoConfiguration.class})
@@ -42,8 +43,11 @@ import org.springframework.context.annotation.Import;
 // Mantemos o EntityScan para o Hibernate mapear a tabela users
 @EntityScan(basePackages = {
     "ca.uhn.fhir.jpa.model.entity", 
-    "ca.uhn.fhir.jpa.entity"
+    "ca.uhn.fhir.jpa.entity",
+    "ca.uhn.fhir.jpa.starter",
+    "ca.uhn.fhir.jpa.starter.security"
 })
+
 public class Application extends SpringBootServletInitializer {
 
     public static void main(String[] args) {

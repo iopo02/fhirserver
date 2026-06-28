@@ -32,6 +32,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
+        // CORREÇÃO CORS DEFINITIVA: Deixar passar requisições OPTIONS (Preflight) do Frontend
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            return;
+        }
+
         String token = getJwtFromRequest(request);
 
         if (StringUtils.hasText(token)) {
@@ -94,9 +100,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                path.startsWith("/fonts/") ||
                path.startsWith("/static/") ||
                path.startsWith("/public/") ||
-               path.equals("/auth/login") ||
-               path.equals("/auth/refresh") ||
-               path.equals("/auth/logout") ||
+               path.contains("/auth/login") ||
+               path.contains("/auth/refresh") ||
+               path.contains("/auth/logout") ||
                path.startsWith("/webjars/") ||
                path.equals("/health");
     }

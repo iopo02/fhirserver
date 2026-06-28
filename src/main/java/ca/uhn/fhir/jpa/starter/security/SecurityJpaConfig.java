@@ -1,46 +1,29 @@
 package ca.uhn.fhir.jpa.starter.security;
 
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanPostProcessor; // <-- CORRIGIDO O IMPORT
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
-import org.springframework.transaction.PlatformTransactionManager;
-import jakarta.persistence.EntityManagerFactory;
-import javax.sql.DataSource;
-import java.util.HashMap;
-import java.util.Map;
 
 @Configuration
-// 1. Vinculamos explicitamente este ecossistema de repositórios aos Beans abaixo
-@EnableJpaRepositories(
-    basePackages = "ca.uhn.fhir.jpa.starter.security",
-    entityManagerFactoryRef = "securityEntityManagerFactory",
-    transactionManagerRef = "securityTransactionManager"
-)
-public class SecurityJpaConfig {
+@EnableJpaRepositories(basePackages = "ca.uhn.fhir.jpa.starter.security")
+public class SecurityJpaConfig implements BeanPostProcessor {
 
-    @Bean(name = "securityEntityManagerFactory")
-    public LocalContainerEntityManagerFactoryBean securityEntityManagerFactory(
-            EntityManagerFactoryBuilder builder, DataSource dataSource) {
-        
-        Map<String, Object> properties = new HashMap<>();
-        properties.put("hibernate.hbm2ddl.auto", "update");
-        properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"); 
-
-        return builder
-                .dataSource(dataSource)
-                .packages("ca.uhn.fhir.jpa.starter.security") // Scan exclusivo para a entidade User
-                .persistenceUnit("securityPU")
-                .properties(properties)
-                .build();
-    }
-
-    @Bean(name = "securityTransactionManager")
-    public PlatformTransactionManager securityTransactionManager(
-            @Qualifier("securityEntityManagerFactory") EntityManagerFactory securityEntityManagerFactory) {
-        return new JpaTransactionManager(securityEntityManagerFactory);
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        // Interceta o Gestor de Entidades customizado do HAPI FHIR antes de ele carregar
+        if (bean instanceof LocalContainerEntityManagerFactoryBean) {
+            LocalContainerEntityManagerFactoryBean emf = (LocalContainerEntityManagerFactoryBean) bean;
+            
+            // Força o HAPI FHIR a incluir o teu pacote de segurança no varrimento do Hibernate
+            emf.setPackagesToScan(
+                "ca.uhn.fhir.jpa.model.entity",
+                "ca.uhn.fhir.jpa.entity",
+                "ca.uhn.fhir.jpa.starter",
+                "ca.uhn.fhir.jpa.starter.security" // <-- Teu pacote adicionado aqui
+            );
+        }
+        return bean;
     }
 }

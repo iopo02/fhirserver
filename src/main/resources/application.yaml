@@ -98,7 +98,7 @@ spring:
     exclude: org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
 
   flyway:
-    enabled: true
+    enabled: false
     baseline-on-migrate: true
     baseline-version: 0
     fail-on-missing-locations: false
@@ -110,6 +110,9 @@ spring:
     driverClassName: org.postgresql.Driver
 
   jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
     properties:
       hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
       hibernate.search.enabled: false

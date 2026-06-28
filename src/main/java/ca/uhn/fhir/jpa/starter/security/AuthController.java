@@ -197,7 +197,9 @@ public class AuthController {
      * DTO for login requests
      */
     public static class LoginRequest {
+
         private String username;
+        
         private String password;
 
         public LoginRequest() {}
@@ -211,6 +213,12 @@ public class AuthController {
 
         public String getPassword() { return password; }
         public void setPassword(String password) { this.password = password; }
+
+        // Getters e Setters alternativos em Snake Case para garantir compatibilidade total
+        public String getUser_name() { return username; }
+        public void setUser_name(String username) { this.username = username; }
+        public String getPass_word() { return password; }
+        public void setPass_word(String password) { this.password = password; }
     }
 
     /**

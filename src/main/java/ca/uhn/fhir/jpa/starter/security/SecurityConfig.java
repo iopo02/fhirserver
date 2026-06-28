@@ -5,8 +5,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 //import org.springframework.security.web.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -28,55 +26,66 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 // 1. ATIVAR CORS COM CONFIGURAÇÃO EXPLÍCITA
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                
-                // 2. CORREÇÃO DO 403/401 EM HTML -> FORMATAR COMO JSON
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setContentType("application/json");
-                            response.setCharacterEncoding("UTF-8");
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("{\"success\":false,\"status\":401,\"error\":\"Não Autorizado\",\"message\":\"" + authException.getMessage() + "\",\"path\":\"" + request.getRequestURI() + "\"}");
-                        })
-                        .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setContentType("application/json");
-                            response.setCharacterEncoding("UTF-8");
-                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.getWriter().write("{\"success\":false,\"status\":403,\"error\":\"Proibido\",\"message\":\"Acesso negado: não tem permissões para este recurso.\",\"path\":\"" + request.getRequestURI() + "\"}");
-                        })
-                )
 
+                // 2. CONFIGURAR SESSÃO COMO STATELESS
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // CONFIGURAÇÃO ADICIONADA: Tratamento de Exceções para devolver JSON em vez de
+                // HTML
+                .exceptionHandling(exception -> exception
+                        // Quando o utilizador está autenticado mas NÃO tem permissão (Ex: Médico a
+                        // tentar aceder a rotas Admin) -> 403 Forbidden
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.getWriter().write(
+                                    "{\"success\":false,\"status\":403,\"error\":\"Proibido\",\"message\":\"Não tens permissões para aceder a este recurso.\"}");
+                        })
+                        // Quando o utilizador nem sequer está autenticado (Token inválido/ausente nas
+                        // rotas protegidas) -> 401 Unauthorized
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.getWriter().write(
+                                    "{\"success\":false,\"status\":401,\"error\":\"Não Autorizado\",\"message\":\"Autenticação necessária para aceder a este recurso.\"}");
+                        }))
+                // 3. CONFIGURAR AUTORIZAÇÃO DE REQUISIÇÕES
                 .authorizeHttpRequests(auth -> auth
+                        // CORREÇÃO CRÍTICA: Usar wildcards (/**) para permitir o login sob qualquer
+                        // prefixo do HAPI FHIR
                         .requestMatchers(
-                                new AntPathRequestMatcher("/"),
                                 new AntPathRequestMatcher("/auth/login"),
                                 new AntPathRequestMatcher("/auth/refresh"),
-                                new AntPathRequestMatcher("/health"),
-                                new AntPathRequestMatcher("/actuator/health/**"),
-                                new AntPathRequestMatcher("/fhir/swagger-ui/**"),
-                                new AntPathRequestMatcher("/fhir/api-docs/**"),
-                                new AntPathRequestMatcher("/fhir/metadata/**"))
+                                new AntPathRequestMatcher("/fhir/metadata"),
+                                new AntPathRequestMatcher("/swagger-ui/**"),
+                                new AntPathRequestMatcher("/v3/api-docs/**"),
+                                new AntPathRequestMatcher("/actuator/health/**"))
                         .permitAll()
+
+                        // Regras de RBAC para os endpoints FHIR e Admin
                         .requestMatchers(new AntPathRequestMatcher("/admin/**")).hasRole("ADMIN")
                         .requestMatchers(new AntPathRequestMatcher("/fhir/**")).hasAnyRole("ADMIN", "MEDICO")
+
+                        // Endpoints que exigem autenticação explícita
                         .requestMatchers(
-                                new AntPathRequestMatcher("/auth/me"),
-                                new AntPathRequestMatcher("/auth/logout"))
+                                new AntPathRequestMatcher("/**/auth/me"),
+                                new AntPathRequestMatcher("/**/auth/logout"))
                         .authenticated()
+
                         .anyRequest().authenticated())
 
+                // 4. DESATIVAR AUTENTICAÇÃO PADRÃO DO SPRING (Basic e Form)
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable())
+
+                // 5. ADICIONAR O FILTRO JWT ANTES DO FILTRO PADRÃO
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -88,10 +97,11 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("*")); // Em produção, define a URL exata do teu Frontend
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
+        configuration
+                .setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(false); // Deve ser false se usares "*" em AllowedOrigins
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
