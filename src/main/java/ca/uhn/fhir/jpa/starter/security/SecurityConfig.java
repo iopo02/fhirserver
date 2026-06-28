@@ -26,70 +26,58 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                // 1. ATIVAR CORS COM CONFIGURAÇÃO EXPLÍCITA
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+            // 1. ATIVAR CORS COM CONFIGURAÇÃO EXPLÍCITA
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            
+            // 2. DESATIVAR CSRF (Necessário para APIs com tokens JWT)
+            .csrf(csrf -> csrf.disable())
 
-                // 2. CONFIGURAR SESSÃO COMO STATELESS
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // 3. GERIR ACESSO AOS ENDPOINTS
+            .authorizeHttpRequests(auth -> auth
+                    // A. Permite que qualquer browser faça a validação CORS (Pre-flight) sem pedir token JWT
+                    .requestMatchers(new AntPathRequestMatcher("/**", org.springframework.http.HttpMethod.OPTIONS.name())).permitAll()
 
-                // CONFIGURAÇÃO ADICIONADA: Tratamento de Exceções para devolver JSON em vez de
-                // HTML
-                .exceptionHandling(exception -> exception
-                        // Quando o utilizador está autenticado mas NÃO tem permissão (Ex: Médico a
-                        // tentar aceder a rotas Admin) -> 403 Forbidden
-                        .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.setContentType("application/json");
-                            response.setCharacterEncoding("UTF-8");
-                            response.getWriter().write(
-                                    "{\"success\":false,\"status\":403,\"error\":\"Proibido\",\"message\":\"Não tens permissões para aceder a este recurso.\"}");
-                        })
-                        // Quando o utilizador nem sequer está autenticado (Token inválido/ausente nas
-                        // rotas protegidas) -> 401 Unauthorized
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            response.setCharacterEncoding("UTF-8");
-                            response.getWriter().write(
-                                    "{\"success\":false,\"status\":401,\"error\":\"Não Autorizado\",\"message\":\"Autenticação necessária para aceder a este recurso.\"}");
-                        }))
-                // 3. CONFIGURAR AUTORIZAÇÃO DE REQUISIÇÕES
-                .authorizeHttpRequests(auth -> auth
-                        // CORREÇÃO CRÍTICA: Usar wildcards (/**) para permitir o login sob qualquer
-                        // prefixo do HAPI FHIR
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/auth/login"),
-                                new AntPathRequestMatcher("/auth/refresh"),
-                                new AntPathRequestMatcher("/fhir/metadata"),
-                                new AntPathRequestMatcher("/swagger-ui/**"),
-                                new AntPathRequestMatcher("/v3/api-docs/**"),
-                                new AntPathRequestMatcher("/actuator/health/**"))
-                        .permitAll()
+                    // B. ROTAS TOTALMENTE PÚBLICAS
+                    .requestMatchers(
+                            new AntPathRequestMatcher("/**/auth/login"),
+                            new AntPathRequestMatcher("/**/auth/refresh"),
+                            new AntPathRequestMatcher("/dashboard"),
+                            new AntPathRequestMatcher("/v3/api-docs/**"),   
+                            new AntPathRequestMatcher("/**/api-docs/**"),   
+                            new AntPathRequestMatcher("/**/swagger-ui/**"),
+                            new AntPathRequestMatcher("/**/metadata/**"), 
+                            new AntPathRequestMatcher("/**/swagger-ui.html")
+                    ).permitAll()
 
-                        // Regras de RBAC para os endpoints FHIR e Admin
-                        .requestMatchers(new AntPathRequestMatcher("/admin/**")).hasRole("ADMIN")
-                        .requestMatchers(new AntPathRequestMatcher("/fhir/**")).hasAnyRole("ADMIN", "MEDICO")
+                    // C. ROTAS QUE EXIGEM AUTENTICAÇÃO
+                    .requestMatchers(
+                            new AntPathRequestMatcher("/**/auth/me"),
+                            new AntPathRequestMatcher("/**/auth/logout")
+                    ).authenticated()
 
-                        // Endpoints que exigem autenticação explícita
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/**/auth/me"),
-                                new AntPathRequestMatcher("/**/auth/logout"))
-                        .authenticated()
+                    // D. QUALQUER OUTRO PEDIDO EXIGE AUTENTICAÇÃO
+                    .anyRequest().authenticated()
+            )
 
-                        .anyRequest().authenticated())
+            // 4. CONFIGURAR SESSÃO COMO STATELESS (Não guarda estado no servidor)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 4. DESATIVAR AUTENTICAÇÃO PADRÃO DO SPRING (Basic e Form)
-                .httpBasic(httpBasic -> httpBasic.disable())
-                .formLogin(form -> form.disable())
+            // 5. GERIR EXCEÇÕES DE AUTENTICAÇÃO
+            .exceptionHandling(exception -> exception
+                    .authenticationEntryPoint((request, response, authException) -> {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\": \"Unauthorized - Token missing or invalid\"}");
+                    })
+            )
 
-                // 5. ADICIONAR O FILTRO JWT ANTES DO FILTRO PADRÃO
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            // 6. ADICIONAR O FILTRO JWT ANTES DO FILTRO PADRÃO
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+    return http.build();
+}
 
     // 3. FONTE DE CONFIGURAÇÃO DO CORS
     @Bean
