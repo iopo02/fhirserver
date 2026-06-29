@@ -54,6 +54,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
                     // C. ROTAS QUE EXIGEM AUTENTICAÇÃO
                     .requestMatchers(
                             new AntPathRequestMatcher("/**/auth/me"),
+                           // new AntPathRequestMatcher("/fhir/**"),
                             new AntPathRequestMatcher("/**/auth/logout")
                     ).authenticated()
 

@@ -39,31 +39,31 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         try {
-            log.info("Login attempt for user: {}", loginRequest.getUsername());
+            log.info("Login attempt for user: {}", loginRequest.getEmail_address());
 
             // Validate credentials using UserService
-            if (!userService.validateCredentials(loginRequest.getUsername(), loginRequest.getPassword())) {
-                log.warn("Invalid credentials for user: {}", loginRequest.getUsername());
+            if (!userService.validateCredentials(loginRequest.getEmail_address(), loginRequest.getPassword())) {
+                log.warn("Invalid credentials for user: {}", loginRequest.getEmail_address());
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
             }
 
             // Get user from database
-            User user = userService.getUserByUsername(loginRequest.getUsername())
+            User user = userService.getUserByEmail(loginRequest.getEmail_address())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
             // Generate access + refresh tokens
             TokenResponse tokenPair = jwtTokenProvider.generateTokenPair(
-                user.getUsername(),
+                user.getEmail(),
                 user.getRoles()
             );
 
-            log.info("Login successful for user: {} with roles: {}", user.getUsername(), user.getRoles());
+            log.info("Login successful for user: {} with roles: {}", user.getEmail(), user.getRoles());
 
             return ResponseEntity.ok(tokenPair);
 
         } catch (Exception e) {
-            log.error("Login failed for user: {}", loginRequest.getUsername(), e);
+            log.error("Login failed for user: {}", loginRequest.getEmail_address(), e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
         }
@@ -198,25 +198,25 @@ public class AuthController {
      */
     public static class LoginRequest {
 
-        private String username;
+        private String email;
         
         private String password;
 
         public LoginRequest() {}
-        public LoginRequest(String username, String password) {
-            this.username = username;
+        public LoginRequest(String email, String password) {
+            this.email = email;
             this.password = password;
         }
 
-        public String getUsername() { return username; }
-        public void setUsername(String username) { this.username = username; }
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
 
         public String getPassword() { return password; }
         public void setPassword(String password) { this.password = password; }
 
         // Getters e Setters alternativos em Snake Case para garantir compatibilidade total
-        public String getUser_name() { return username; }
-        public void setUser_name(String username) { this.username = username; }
+        public String getEmail_address() { return email; }
+        public void setEmail_address(String email) { this.email = email; }
         public String getPass_word() { return password; }
         public void setPass_word(String password) { this.password = password; }
     }
