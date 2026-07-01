@@ -15,7 +15,8 @@ import java.util.Set;
  * Authentication Controller - Simplified for demonstration
  * 
  * Provides endpoints for:
- * - POST /auth/login - Login with username/password, returns access + refresh tokens
+ * - POST /auth/login - Login with username/password, returns access + refresh
+ * tokens
  * - POST /auth/refresh - Renew access token using refresh token
  * - POST /auth/logout - Revoke access token (logout)
  * - GET /auth/me - Get current user info
@@ -45,18 +46,17 @@ public class AuthController {
             if (!userService.validateCredentials(loginRequest.getEmail_address(), loginRequest.getPassword())) {
                 log.warn("Invalid credentials for user: {}", loginRequest.getEmail_address());
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
+                        .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
             }
 
             // Get user from database
             User user = userService.getUserByEmail(loginRequest.getEmail_address())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
             // Generate access + refresh tokens
             TokenResponse tokenPair = jwtTokenProvider.generateTokenPair(
-                user.getEmail(),
-                user.getRoles()
-            );
+                    user.getEmail(),
+                    user.getRoles());
 
             log.info("Login successful for user: {} with roles: {}", user.getEmail(), user.getRoles());
 
@@ -65,7 +65,7 @@ public class AuthController {
         } catch (Exception e) {
             log.error("Login failed for user: {}", loginRequest.getEmail_address(), e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
+                    .body(new ErrorResponse("Invalid credentials", System.currentTimeMillis()));
         }
     }
 
@@ -80,7 +80,7 @@ public class AuthController {
         try {
             if (request.getRefreshToken() == null || request.getRefreshToken().isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("Refresh token required", System.currentTimeMillis()));
+                        .body(new ErrorResponse("Refresh token required", System.currentTimeMillis()));
             }
 
             log.info("Refresh token request");
@@ -91,15 +91,14 @@ public class AuthController {
 
             if (username == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse("Invalid refresh token", System.currentTimeMillis()));
+                        .body(new ErrorResponse("Invalid refresh token", System.currentTimeMillis()));
             }
 
             // Renova o access token
             TokenResponse newTokens = jwtTokenProvider.refreshAccessToken(
-                request.getRefreshToken(),
-                username,
-                roles
-            );
+                    request.getRefreshToken(),
+                    username,
+                    roles);
 
             log.info("Token refreshed for user: {}", username);
             return ResponseEntity.ok(newTokens);
@@ -107,45 +106,42 @@ public class AuthController {
         } catch (RuntimeException e) {
             log.error("Token refresh failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorResponse(e.getMessage(), System.currentTimeMillis()));
+                    .body(new ErrorResponse(e.getMessage(), System.currentTimeMillis()));
         } catch (Exception e) {
             log.error("Token refresh error", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse("Internal server error", System.currentTimeMillis()));
+                    .body(new ErrorResponse("Internal server error", System.currentTimeMillis()));
         }
     }
 
     /**
-     * Logout - revoga o access token
+     * Logout - revoga o refresh token
      * 
      * POST /auth/logout
-     * Header: Authorization: Bearer <access_token>
+     * Body: { "refresh_token": "..." }
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+    public ResponseEntity<?> logout(@RequestBody RefreshTokenRequest request) {
         try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            if (request.getRefreshToken() == null || request.getRefreshToken().isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("Authorization header required", System.currentTimeMillis()));
+                        .body(new ErrorResponse("Refresh token required", System.currentTimeMillis()));
             }
 
-            String token = authHeader.substring(7);
-            String username = jwtTokenProvider.getUsernameFromToken(token);
+            String username = jwtTokenProvider.getUsernameFromToken(request.getRefreshToken());
 
-            // Revoga o token
-            jwtTokenProvider.revokeToken(token);
+            // Revoga o refresh token
+            jwtTokenProvider.revokeToken(request.getRefreshToken());
 
             log.info("Logout successful for user: {}", username);
 
             return ResponseEntity.ok(Map.of(
-                "message", "Logged out successfully",
-                "timestamp", System.currentTimeMillis()
-            ));
-
+                    "message", "Logged out successfully",
+                    "timestamp", System.currentTimeMillis()));
         } catch (Exception e) {
             log.error("Logout failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse("Logout failed", System.currentTimeMillis()));
+                    .body(new ErrorResponse("Logout failed", System.currentTimeMillis()));
         }
     }
 
@@ -161,15 +157,15 @@ public class AuthController {
     public ResponseEntity<?> getCurrentUser() {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            
+
             if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse("No authenticated user", System.currentTimeMillis()));
+                        .body(new ErrorResponse("No authenticated user", System.currentTimeMillis()));
             }
 
             String username = authentication.getName();
             User user = userService.getUserByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
             // Build user response
             Map<String, Object> userResponse = new HashMap<>();
@@ -189,7 +185,7 @@ public class AuthController {
         } catch (Exception e) {
             log.error("Error retrieving user info", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse("Error retrieving user info", System.currentTimeMillis()));
+                    .body(new ErrorResponse("Error retrieving user info", System.currentTimeMillis()));
         }
     }
 
@@ -199,26 +195,50 @@ public class AuthController {
     public static class LoginRequest {
 
         private String email;
-        
+
         private String password;
 
-        public LoginRequest() {}
+        public LoginRequest() {
+        }
+
         public LoginRequest(String email, String password) {
             this.email = email;
             this.password = password;
         }
 
-        public String getEmail() { return email; }
-        public void setEmail(String email) { this.email = email; }
+        public String getEmail() {
+            return email;
+        }
 
-        public String getPassword() { return password; }
-        public void setPassword(String password) { this.password = password; }
+        public void setEmail(String email) {
+            this.email = email;
+        }
 
-        // Getters e Setters alternativos em Snake Case para garantir compatibilidade total
-        public String getEmail_address() { return email; }
-        public void setEmail_address(String email) { this.email = email; }
-        public String getPass_word() { return password; }
-        public void setPass_word(String password) { this.password = password; }
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        // Getters e Setters alternativos em Snake Case para garantir compatibilidade
+        // total
+        public String getEmail_address() {
+            return email;
+        }
+
+        public void setEmail_address(String email) {
+            this.email = email;
+        }
+
+        public String getPass_word() {
+            return password;
+        }
+
+        public void setPass_word(String password) {
+            this.password = password;
+        }
     }
 
     /**
@@ -233,11 +253,21 @@ public class AuthController {
             this.timestamp = timestamp;
         }
 
-        public String getError() { return error; }
-        public void setError(String error) { this.error = error; }
+        public String getError() {
+            return error;
+        }
 
-        public long getTimestamp() { return timestamp; }
-        public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+        public void setError(String error) {
+            this.error = error;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public void setTimestamp(long timestamp) {
+            this.timestamp = timestamp;
+        }
     }
 
     /**
@@ -246,16 +276,28 @@ public class AuthController {
     public static class RefreshTokenRequest {
         private String refresh_token;
 
-        public RefreshTokenRequest() {}
+        public RefreshTokenRequest() {
+        }
+
         public RefreshTokenRequest(String refreshToken) {
             this.refresh_token = refreshToken;
         }
 
-        public String getRefreshToken() { return refresh_token; }
-        public void setRefreshToken(String refreshToken) { this.refresh_token = refreshToken; }
+        public String getRefreshToken() {
+            return refresh_token;
+        }
+
+        public void setRefreshToken(String refreshToken) {
+            this.refresh_token = refreshToken;
+        }
 
         // Getter alternativo com snake_case para JSON
-        public String getRefresh_token() { return refresh_token; }
-        public void setRefresh_token(String refresh_token) { this.refresh_token = refresh_token; }
+        public String getRefresh_token() {
+            return refresh_token;
+        }
+
+        public void setRefresh_token(String refresh_token) {
+            this.refresh_token = refresh_token;
+        }
     }
 }

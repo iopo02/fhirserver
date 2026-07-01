@@ -36,31 +36,37 @@ public class SecurityDbInitializer {
 	}
 
 	private void createAdminUserIfMissing(Connection conn) {
-		String checkSql = "SELECT COUNT(*) FROM users";
-		try (Statement stmt = conn.createStatement();
-			 ResultSet rs = stmt.executeQuery(checkSql)) {
-			
+		// 1. Verifica especificamente pelo EMAIL do admin, não pelo count total
+		String checkSql = "SELECT COUNT(*) FROM users WHERE email = 'admin@email.com'";
+
+		try (PreparedStatement psCheck = conn.prepareStatement(checkSql);
+				ResultSet rs = psCheck.executeQuery()) {
+
 			if (rs.next() && rs.getInt(1) == 0) {
-				log.info("No users found in database. Seeding default 'admin' user...");
-				
+				log.info("Admin user not found. Seeding default 'admin' user...");
+
+				// Gera a hash de forma limpa
 				String encryptedPassword = passwordEncoder.encode("admin123");
 
 				String insertUserSql = """
-					INSERT INTO users (id, username, email, password, first_name, last_name, active, locked, created_at, updated_at)
-					VALUES (1, 'admin', 'admin@email.com', ?, 'Admin', 'Global', TRUE, FALSE, NOW(), NOW())
-				""";
-				
+						    INSERT INTO users (id, username, email, password, first_name, last_name, active, locked, created_at, updated_at)
+						    VALUES (1, 'admin', 'admin@email.com', ?, 'Admin', 'Global', TRUE, FALSE, NOW(), NOW())
+						""";
+
 				try (PreparedStatement psUser = conn.prepareStatement(insertUserSql)) {
 					psUser.setString(1, encryptedPassword);
 					psUser.executeUpdate();
 				}
 
+				// Inserir a role apenas se o user acabou de ser criado
 				String insertRoleSql = "INSERT INTO user_roles (user_id, role) VALUES (1, 'ADMIN')";
-				stmt.execute(insertRoleSql);
+				try (Statement stmtRole = conn.createStatement()) {
+					stmtRole.execute(insertRoleSql);
+				}
 
 				log.info("Default administrator 'admin' successfully seeded with password 'admin123'.");
 			} else {
-				log.info("Users table is not empty. Skipping admin user seeding.");
+				log.info("Admin user ('admin@email.com') already exists. Skipping seed.");
 			}
 		} catch (Exception e) {
 			log.error("Error seeding default admin user into database", e);
