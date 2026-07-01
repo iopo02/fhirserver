@@ -163,8 +163,8 @@ public class AuthController {
                         .body(new ErrorResponse("No authenticated user", System.currentTimeMillis()));
             }
 
-            String username = authentication.getName();
-            User user = userService.getUserByUsername(username)
+            String email = authentication.getName();
+            User user = userService.getUserByEmail(email)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
             // Build user response
@@ -179,7 +179,7 @@ public class AuthController {
             userResponse.put("locked", user.getLocked());
             userResponse.put("timestamp", System.currentTimeMillis());
 
-            log.debug("User info retrieved for: {}", username);
+            log.debug("User info retrieved for: {}", user);
             return ResponseEntity.ok(userResponse);
 
         } catch (Exception e) {
