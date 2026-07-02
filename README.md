@@ -6,10 +6,11 @@ Note that this project is specifically intended for end users of the HAPI FHIR J
 
 While this project shows how you can use many parts of the HAPI FHIR framework there are a set of features which you should be aware of are missing or something you need to supply yourself or get professional support ahead of using it directly in production:
 
-1) ✅ The service now includes JWT-based security (Beta). See [Security & Authentication](#security--authentication) below.
-2) The service comes with no enterprise logging. See how it can be done [here](https://hapifhir.io/hapi-fhir/docs/security/balp_interceptor.html)
-3) The internal topic cache used by subscriptions in HAPI FHIR are not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-jpaserver-subscription/src/main/java/ca/uhn/fhir/jpa/topic/ActiveSubscriptionTopicCache.java)
-4) The internal message broker channel in HAPI FHIR is not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-storage/src/main/java/ca/uhn/fhir/jpa/subscription/channel/api/IChannelFactory.java). This impacts the use of modules listed [here](https://smilecdr.com/docs/installation/message_broker.html#modules-dependent-on-message-brokers)
+1) ✅ The service now includes JWT-based security with RBAC. See [Security & Authentication](#security--authentication) below.
+2) ✅ Ingestion pipeline with JWT authentication for automated data loading. See [Pipeline with Authentication](#pipeline-with-jwt-authentication) below.
+3) ⚠️ The service comes with no enterprise logging. See how it can be done [here](https://hapifhir.io/hapi-fhir/docs/security/balp_interceptor.html)
+4) ⚠️ The internal topic cache used by subscriptions in HAPI FHIR are not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-jpaserver-subscription/src/main/java/ca/uhn/fhir/jpa/topic/ActiveSubscriptionTopicCache.java)
+5) ⚠️ The internal message broker channel in HAPI FHIR is not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-storage/src/main/java/ca/uhn/fhir/jpa/subscription/channel/api/IChannelFactory.java). This impacts the use of modules listed [here](https://smilecdr.com/docs/installation/message_broker.html#modules-dependent-on-message-brokers)
 
 Need Help? Please see: https://github.com/hapifhir/hapi-fhir/wiki/Getting-Help
 
@@ -86,11 +87,30 @@ Content-Type: application/json
 }
 ```
 
-#### 4. Logout (Revoke Token)
+#### 4. Logout (Revoke Tokens Immediately)
 ```bash
 POST /auth/logout
 Authorization: Bearer <accessToken>
+Content-Type: application/json
+
+{
+  "refresh_token": "<refreshToken>"
+}
 ```
+
+**Response:**
+```json
+{
+  "message": "Logged out successfully",
+  "timestamp": 1720046400000
+}
+```
+
+**Important**: The logout endpoint revokes **both** tokens immediately:
+- Access token added to blacklist (expires in 15 min naturally)
+- Refresh token added to blacklist (expires in 7 days naturally)
+- Any subsequent request with these tokens will be rejected with **401 Unauthorized**
+- After logout, user must login again to get new tokens
 
 ### Authorization Rules
 
@@ -143,6 +163,170 @@ jwt:
 ```
 
 ⚠️ **Important**: Change the `jwt.secret` in production to a strong, randomly generated value.
+
+---
+
+## Pipeline with JWT Authentication
+
+The project includes an **automated data ingestion pipeline** that securely uploads FHIR bundles to the server using JWT authentication.
+
+### Features
+
+✅ **Secure by Default**: Pipeline authenticates with service account credentials
+✅ **Automatic Token Renewal**: Tokens refreshed before expiration
+✅ **Batch Processing**: Parallel ingestion (8 workers by default)
+✅ **Auto-Trigger Monitoring**: Watches `data/input/` for new files
+✅ **Persistent Cache**: Tokens cached to avoid repeated logins
+✅ **Error Handling**: Failed files moved to `data/error/`
+
+### Quick Start
+
+#### 1. Create a Service Account for the Pipeline
+
+```bash
+python create_pipeline_user.py \
+  --server http://localhost:8080 \
+  --admin-email admin@email.com \
+  --admin-password admin123 \
+  --pipeline-email pipeline@fhirserver.local \
+  --pipeline-password MySecurePassword123
+```
+
+This command:
+- Authenticates as admin
+- Creates a new service account with `INGESTION` role
+- Tests the credentials
+- Outputs configuration instructions
+
+#### 2. Configure Docker Compose
+
+Create a `.env` file in the `docker/` directory:
+
+```env
+# .env
+PIPELINE_AUTH_PASSWORD=MySecurePassword123
+```
+
+Or edit `docker/docker-compose.yml` directly:
+
+```yaml
+environment:
+  PIPELINE_AUTH_ENABLED: "true"
+  PIPELINE_AUTH_EMAIL: "pipeline@fhirserver.local"
+  PIPELINE_AUTH_PASSWORD: "MySecurePassword123"
+  HAPI_URL: "http://hapi-fhir-jpaserver-start:8080"
+  PIPELINE_WORKERS: "8"
+```
+
+#### 3. Start the Pipeline
+
+```bash
+# Using Docker Compose (recommended)
+cd docker
+docker-compose up -d ingestion-pipeline
+
+# Or run locally
+python pipeline_ingestao.py --watch
+```
+
+### How It Works
+
+```
+┌─────────────────┐
+│  data/input/    │  → New JSON files detected
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────┐
+│  Pipeline Authentication        │
+│  1. Read PIPELINE_AUTH_PASSWORD │
+│  2. POST /auth/login            │
+│  3. Get access_token + refresh  │
+│  4. Cache tokens locally        │
+└────────┬────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────┐
+│  Process Each File              │
+│  1. Parse JSON → FHIR resources │
+│  2. Build Bundle transaction    │
+│  3. Check token expiration      │
+│  4. Add Authorization header    │
+│  5. POST to /fhir with Bundle   │
+└────────┬────────────────────────┘
+         │
+         ▼
+┌──────────────────┬──────────────┐
+│  data/processed/ │  data/error/ │
+│  (Success)       │  (Failure)   │
+└──────────────────┴──────────────┘
+```
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PIPELINE_AUTH_ENABLED` | `true` | Enable/disable JWT authentication |
+| `PIPELINE_AUTH_EMAIL` | `pipeline@fhirserver.local` | Service account email |
+| `PIPELINE_AUTH_PASSWORD` | ⚠️ Required | Service account password |
+| `HAPI_URL` | `http://localhost:8080` | FHIR server URL (without `/fhir`) |
+| `PIPELINE_WORKERS` | `8` | Number of parallel threads |
+| `PIPELINE_TIMEOUT` | `30` | HTTP request timeout (seconds) |
+| `PIPELINE_POLL` | `5` | File polling interval (seconds) |
+
+### Testing the Pipeline
+
+#### 1. Place a test file in `data/input/`
+
+```bash
+cat > data/input/test_patient.json << 'EOF'
+{
+  "patient_id": "12345",
+  "name": "João Silva",
+  "birth_date": "1990-05-15",
+  "gender": "male",
+  "contact": "joao@example.com"
+}
+EOF
+```
+
+#### 2. Check logs
+
+```bash
+# Real-time logs
+tail -f logs/ingesta.log
+
+# Verify success
+grep "✓" logs/ingesta.log
+
+# Check for errors
+grep "✗" logs/ingesta.log
+```
+
+#### 3. Verify in FHIR server
+
+```bash
+# Query the newly created Patient
+curl -X GET http://localhost:8080/fhir/Patient/12345 \
+  -H "Authorization: Bearer <your_token>"
+```
+
+### Security Features
+
+- **Service Account**: Pipeline has limited `INGESTION` role (cannot modify system settings)
+- **Short-Lived Tokens**: Access tokens expire in 15 minutes
+- **Token Revocation**: Tokens added to blacklist immediately on logout
+- **Automatic Renewal**: Refresh tokens used to get new access tokens without re-login
+- **Persistent Cache**: Tokens cached to `logs/.pipeline_auth_cache.json` (include in `.gitignore`)
+
+### Troubleshooting
+
+For detailed troubleshooting, error codes, and solution strategies, see [PIPELINE_AUTH.md](./PIPELINE_AUTH.md).
+
+Common issues:
+- **"Unauthorized - Token missing or invalid"** → Check `PIPELINE_AUTH_PASSWORD` is set
+- **"Login failed for user: pipeline@..."** → Recreate service account with `create_pipeline_user.py`
+- **"Falha ao autenticar; encerrando pipeline"** → Verify server is running and accessible
 
 ---
 
