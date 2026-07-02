@@ -6,6 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.util.StringUtils;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -115,13 +117,15 @@ public class AuthController {
     }
 
     /**
-     * Logout - revoga o refresh token
+     * Logout - revoga AMBOS os tokens (access + refresh)
+     * Faz logout imediato, impedindo futuras requisições
      * 
      * POST /auth/logout
+     * Header: Authorization: Bearer <access_token>
      * Body: { "refresh_token": "..." }
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<?> logout(@RequestBody RefreshTokenRequest request, HttpServletRequest httpRequest) {
         try {
             if (request.getRefreshToken() == null || request.getRefreshToken().isEmpty()) {
                 return ResponseEntity.badRequest()
@@ -130,10 +134,18 @@ public class AuthController {
 
             String username = jwtTokenProvider.getUsernameFromToken(request.getRefreshToken());
 
-            // Revoga o refresh token
+            // 1. Revoga o refresh token
             jwtTokenProvider.revokeToken(request.getRefreshToken());
+            log.info("Refresh token revoked for user: {}", username);
 
-            log.info("Logout successful for user: {}", username);
+            // 2. Extrai e revoga o access token do header Authorization
+            String accessToken = extractAccessToken(httpRequest);
+            if (StringUtils.hasText(accessToken)) {
+                jwtTokenProvider.revokeToken(accessToken);
+                log.info("Access token revoked for user: {}", username);
+            }
+
+            log.info("Complete logout successful for user: {}", username);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Logged out successfully",
@@ -143,6 +155,17 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Logout failed", System.currentTimeMillis()));
         }
+    }
+
+    /**
+     * Extrai o token JWT do header Authorization
+     */
+    private String extractAccessToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring("Bearer ".length());
+        }
+        return null;
     }
 
     /**

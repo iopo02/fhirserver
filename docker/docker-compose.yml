@@ -70,10 +70,20 @@ services:
         condition: service_healthy
 
     environment:
-      HAPI_URL: "http://hapi-fhir-jpaserver-start:8080/fhir"
+      # URL do servidor FHIR (sem /fhir - é adicionado pelo pipeline)
+      HAPI_URL: "http://hapi-fhir-jpaserver-start:8080"
+      
+      # Configuração do Pipeline
       PIPELINE_WORKERS: "8"
       PIPELINE_TIMEOUT: "30"
       PIPELINE_POLL: "5"
+      
+      # Autenticação JWT (Service Account)
+      PIPELINE_AUTH_ENABLED: "true"
+      PIPELINE_AUTH_EMAIL: "admin@email.com"
+      PIPELINE_AUTH_PASSWORD: "admin123"
+      
+      # Acesso ao Banco de Dados (se necessário)
       DB_HOST: "hapi-fhir-postgres"
       DB_PORT: "5432"
       DB_NAME: "hapi"

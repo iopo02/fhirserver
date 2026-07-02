@@ -7,6 +7,7 @@ Pipeline de Ingestão FHIR com Auto-Trigger
 ✓ ThreadPoolExecutor paralelo
 ✓ Retry automático com backoff
 ✓ Auto-trigger (monitora data/input continuamente)
+✓ Autenticação JWT com service account
 
 Nota: Validação FHIR é feita em fhir.py (build_resources)
 """
@@ -28,6 +29,9 @@ from urllib3.util.retry import Retry
 # Conversor FHIR
 from fhir import build_resources
 
+# Autenticação JWT
+from pipeline.auth import JwtAuthManager
+
 # ==========================================================
 # CONFIGURAÇÃO
 # ==========================================================
@@ -38,15 +42,26 @@ ERROR_DIR     = os.path.join(BASE_DIR, "data", "error")
 LOG_DIR       = os.path.join(BASE_DIR, "logs")
 LOG_FILE      = os.path.join(LOG_DIR, "ingesta.log")
 
-HAPI_URL      = os.getenv("HAPI_URL", "http://localhost:8080/fhir")
-MAX_WORKERS   = int(os.getenv("PIPELINE_WORKERS", "8"))
-REQUEST_TIMEOUT = int(os.getenv("PIPELINE_TIMEOUT", "30"))
-POLL_INTERVAL = int(os.getenv("PIPELINE_POLL", "5"))  # segundos entre verificações
+# FHIR Server
+HAPI_URL           = os.getenv("HAPI_URL", "http://localhost:8080")
+HAPI_FHIR_ENDPOINT = os.path.join(HAPI_URL, "fhir")
+MAX_WORKERS        = int(os.getenv("PIPELINE_WORKERS", "8"))
+REQUEST_TIMEOUT    = int(os.getenv("PIPELINE_TIMEOUT", "30"))
+POLL_INTERVAL      = int(os.getenv("PIPELINE_POLL", "5"))  # segundos entre verificações
+
+# Autenticação (JWT Service Account)
+AUTH_ENABLED       = os.getenv("PIPELINE_AUTH_ENABLED", "true").lower() == "true"
+AUTH_EMAIL         = os.getenv("PIPELINE_AUTH_EMAIL", "admin@email.com")
+AUTH_PASSWORD      = os.getenv("PIPELINE_AUTH_PASSWORD", "admin123")
+AUTH_CACHE_FILE    = os.path.join(LOG_DIR, ".pipeline_auth_cache.json")
 
 FHIR_HEADERS  = {
     "Content-Type": "application/fhir+json",
     "Accept":       "application/fhir+json",
 }
+
+# Instância global de autenticação (inicializada mais adiante)
+auth_manager: Optional[JwtAuthManager] = None
 
 # ==========================================================
 # LOGGING — stdout + ficheiro
@@ -238,13 +253,25 @@ def build_bundle(resources: List[Dict[str, Any]]) -> Dict[str, Any]:
 def send_bundle(bundle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Envia o Bundle transaction para o HAPI FHIR.
+    
+    Se AUTH_ENABLED, adiciona token JWT ao header Authorization.
     Devolve o JSON de resposta ou None em caso de erro.
     """
     try:
+        headers = FHIR_HEADERS.copy()
+        
+        # Adicionar autenticação se ativada
+        if AUTH_ENABLED and auth_manager:
+            auth_headers = auth_manager.get_authorization_header()
+            if not auth_headers:
+                log.error("Falha ao obter token JWT; ingestão cancelada")
+                return None
+            headers.update(auth_headers)
+        
         response = _SESSION.post(
-            HAPI_URL,
+            HAPI_FHIR_ENDPOINT,
             json=bundle,
-            headers=FHIR_HEADERS,
+            headers=headers,
             timeout=REQUEST_TIMEOUT,
         )
     except requests.exceptions.RequestException as exc:
@@ -385,7 +412,27 @@ def process_files(file_list: List[str]) -> Tuple[int, int]:
 
 def run_once():
     """Processa ficheiros que existem em data/input/ neste momento"""
+    global auth_manager, AUTH_ENABLED
+    
     setup_directories()
+    
+    # Inicializar autenticação se ativada
+    auth_enabled = AUTH_ENABLED
+    if auth_enabled:
+        if not AUTH_PASSWORD:
+            log.error("PIPELINE_AUTH_PASSWORD não configurada. Autenticação desativada.")
+            auth_enabled = False
+        else:
+            auth_manager = JwtAuthManager(
+                auth_url=HAPI_URL,
+                email=AUTH_EMAIL,
+                password=AUTH_PASSWORD,
+                cache_file=AUTH_CACHE_FILE,
+            )
+            if not auth_manager.get_access_token():
+                log.error("Falha ao autenticar; encerrando pipeline")
+                return
+            AUTH_ENABLED = auth_enabled
     
     files = [f for f in os.listdir(INPUT_DIR) if f.endswith(".json")]
     if not files:
@@ -398,7 +445,27 @@ def run_once():
 
 def run_with_autotrigger():
     """Auto-trigger contínuo: monitora data/input/ e processa automaticamente"""
+    global auth_manager, AUTH_ENABLED
+    
     setup_directories()
+    
+    # Inicializar autenticação se ativada
+    auth_enabled = AUTH_ENABLED
+    if auth_enabled:
+        if not AUTH_PASSWORD:
+            log.error("PIPELINE_AUTH_PASSWORD não configurada. Autenticação desativada.")
+            auth_enabled = False
+        else:
+            auth_manager = JwtAuthManager(
+                auth_url=HAPI_URL,
+                email=AUTH_EMAIL,
+                password=AUTH_PASSWORD,
+                cache_file=AUTH_CACHE_FILE,
+            )
+            if not auth_manager.get_access_token():
+                log.error("Falha ao autenticar; encerrando pipeline")
+                return
+            AUTH_ENABLED = auth_enabled
     
     poller = FilePoller(INPUT_DIR, poll_interval=POLL_INTERVAL)
     
