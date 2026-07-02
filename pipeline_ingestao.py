@@ -44,7 +44,7 @@ LOG_FILE      = os.path.join(LOG_DIR, "ingesta.log")
 
 # FHIR Server
 HAPI_URL           = os.getenv("HAPI_URL", "http://localhost:8080")
-HAPI_FHIR_ENDPOINT = os.path.join(HAPI_URL, "fhir")
+HAPI_FHIR_ENDPOINT = f"{HAPI_URL.rstrip('/')}/fhir"
 MAX_WORKERS        = int(os.getenv("PIPELINE_WORKERS", "8"))
 REQUEST_TIMEOUT    = int(os.getenv("PIPELINE_TIMEOUT", "30"))
 POLL_INTERVAL      = int(os.getenv("PIPELINE_POLL", "5"))  # segundos entre verificações
@@ -294,63 +294,141 @@ def send_bundle(bundle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 def ingestar_ficheiro(json_file_path: str, filename: str) -> bool:
     """
     Processa um ficheiro JSON:
-      1. Lê e converte para recursos FHIR
-      2. Constrói um Bundle transaction com PUT idempotente
-      3. Envia o Bundle ao HAPI numa única chamada HTTP
-      4. Move o ficheiro para processed/ ou error/ consoante resultado
+      1. Detecta se o ficheiro já está em formato FHIR
+      2. Se necessário, converte JSON proprietário -> FHIR
+      3. Constrói Bundle transaction
+      4. Envia para HAPI
+      5. Move para processed/ ou error/
 
-    Devolve True em caso de sucesso, False em caso de erro.
+    Suporta:
+      ✓ Bundle FHIR
+      ✓ Resource FHIR individual
+      ✓ Lista de recursos FHIR
+      ✓ JSON proprietário PACS
     """
+
     log.info(f"A processar: {filename}")
 
-    # --- 1. Leitura do ficheiro ---
+    # ======================================================
+    # 1. LEITURA DO JSON
+    # ======================================================
     try:
         with open(json_file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+
     except (OSError, json.JSONDecodeError) as exc:
         log.error(f"{filename} — erro de leitura/parse: {exc}")
         _mover(json_file_path, ERROR_DIR, filename)
         return False
 
-    # --- 2. Conversão para FHIR (inclui validação interna) ---
+    # ======================================================
+    # 2. DETEÇÃO AUTOMÁTICA DE FORMATO FHIR
+    # ======================================================
     try:
-        fhir_output  = build_resources(data)
-        resources    = normalize(fhir_output)
+
+        resources = []
+
+        # --------------------------------------------------
+        # CASO A: Bundle FHIR
+        # --------------------------------------------------
+        if (
+            isinstance(data, dict)
+            and data.get("resourceType") == "Bundle"
+        ):
+            log.info(f"{filename} — Bundle FHIR detectado")
+            resources = normalize(data)
+
+        # --------------------------------------------------
+        # CASO B: Recurso FHIR individual
+        # --------------------------------------------------
+        elif (
+            isinstance(data, dict)
+            and "resourceType" in data
+        ):
+            log.info(
+                f"{filename} — Recurso FHIR detectado: "
+                f"{data.get('resourceType')}"
+            )
+            resources = [data]
+
+        # --------------------------------------------------
+        # CASO C: Lista de recursos FHIR
+        # --------------------------------------------------
+        elif (
+            isinstance(data, list)
+            and all(
+                isinstance(r, dict)
+                and "resourceType" in r
+                for r in data
+            )
+        ):
+            log.info(
+                f"{filename} — Lista de recursos FHIR detectada"
+            )
+            resources = data
+
+        # --------------------------------------------------
+        # CASO D: JSON proprietário -> converter
+        # --------------------------------------------------
+        else:
+            log.info(
+                f"{filename} — JSON proprietário detectado; "
+                f"a converter para FHIR"
+            )
+
+            fhir_output = build_resources(data)
+            resources = normalize(fhir_output)
+
     except Exception as exc:
-        log.error(f"{filename} — erro na conversão FHIR: {exc}")
+        log.error(f"{filename} — erro na conversão/deteção FHIR: {exc}")
         _mover(json_file_path, ERROR_DIR, filename)
         return False
 
+    # ======================================================
+    # 3. VALIDAR RECURSOS
+    # ======================================================
     if not resources:
-        log.warning(f"{filename} — nenhum recurso gerado; movido para error/")
-        _mover(json_file_path, ERROR_DIR, filename)
-        return False
-
-    # Validação mínima: deve existir pelo menos um Patient
-    has_patient = any(r.get("resourceType") == "Patient" for r in resources)
-    if not has_patient:
-        log.error(f"{filename} — recurso Patient não encontrado; movido para error/")
+        log.warning(f"{filename} — nenhum recurso gerado")
         _mover(json_file_path, ERROR_DIR, filename)
         return False
 
     log.info(
-        f"{filename} — {len(resources)} recursos gerados: "
-        + ", ".join(r.get('resourceType', '?') for r in resources)
+        f"{filename} — {len(resources)} recurso(s): "
+        + ", ".join(
+            r.get("resourceType", "?")
+            for r in resources
+        )
     )
 
-    # --- 3. Bundle transaction (1 chamada HTTP) ---
-    bundle   = build_bundle(resources)
-    response = send_bundle(bundle)
+    # ======================================================
+    # 4. BUILD BUNDLE
+    # ======================================================
+    try:
+        bundle = build_bundle(resources)
 
-    if not response:
+    except Exception as exc:
+        log.error(f"{filename} — erro a construir Bundle: {exc}")
         _mover(json_file_path, ERROR_DIR, filename)
         return False
 
-    # --- 4. Mover para processed/ ---
-    _mover(json_file_path, PROCESSED_DIR, filename)
-    log.info(f"{filename} — ingestão concluída com sucesso ✓")
-    return True
+    # ======================================================
+    # 5. ENVIAR PARA HAPI
+    # ======================================================
+    response = send_bundle(bundle)
 
+    if not response:
+        log.error(f"{filename} — erro no envio para HAPI")
+        _mover(json_file_path, ERROR_DIR, filename)
+        return False
+
+    # ======================================================
+    # 6. SUCCESS
+    # ======================================================
+    _mover(json_file_path, PROCESSED_DIR, filename)
+
+    log.info(f"{filename} — ingestão concluída com sucesso ✓")
+
+    return True
 
 # ==========================================================
 # UTILITÁRIO: mover ficheiro com segurança
