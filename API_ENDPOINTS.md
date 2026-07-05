@@ -118,3 +118,72 @@ Dashboard: GET /fhir/Patient/pat-25
   "summaryUrl":        "/fhir/Patient/pat-25/$summary"
 }
 ```
+
+---
+
+## 7. Estatísticas de Recursos (NEW)
+
+⭐ **Base URL:** `/api/statistics`
+
+Endpoints para obter estatísticas agregadas e agrupadas de recursos FHIR. Úteis para dashboards, relatórios operacionais e monitoramento.
+
+| Método | URL | Descrição |
+| :--- | :--- | :--- |
+| `GET` | `/api/statistics/diagnostic-report/by-status` | Contagem de DiagnosticReports agrupados por status (final, preliminary, amended, etc). |
+| `GET` | `/api/statistics/diagnostic-report/by-category` | Contagem de DiagnosticReports agrupados por categoria (imaging, laboratory, etc). |
+| `GET` | `/api/statistics/imaging-study/by-category` | Contagem de ImagingStudies agrupados por modalidade (CT, MR, US, XC, etc). |
+| `GET` | `/api/statistics/imaging-study/by-status` | Contagem de ImagingStudies agrupados por status (available, unavailable, entered-in-error). |
+
+### Formato de Response
+
+Todos os endpoints retornam o seguinte formato:
+
+```json
+{
+  "timestamp": "2026-07-05T10:30:00.123456Z",
+  "resourceType": "DiagnosticReport",
+  "groupBy": "status",
+  "data": [
+    { "name": "final", "count": 1250 },
+    { "name": "preliminary", "count": 450 },
+    { "name": "amended", "count": 100 }
+  ],
+  "total": 1800
+}
+```
+
+**Campos:**
+- `timestamp` (ISO 8601): Data/hora da query em UTC
+- `resourceType`: Tipo de recurso FHIR consultado
+- `groupBy`: Critério de agrupamento (status, category, etc)
+- `data`: Array com items agrupados (`name` + `count`)
+- `total`: Soma de todos os counts
+
+### Exemplos de Uso
+
+```bash
+# DiagnosticReport por Status
+curl -X GET http://localhost:8080/api/statistics/diagnostic-report/by-status
+
+# DiagnosticReport por Categoria
+curl -X GET http://localhost:8080/api/statistics/diagnostic-report/by-category
+
+# ImagingStudy por Categoria/Modalidade
+curl -X GET http://localhost:8080/api/statistics/imaging-study/by-category
+
+# ImagingStudy por Status
+curl -X GET http://localhost:8080/api/statistics/imaging-study/by-status
+```
+
+### Performance
+
+- Tipicamente **< 100ms** com índices apropriados
+- Usa queries SQL nativas com `GROUP BY` no PostgreSQL
+- Escalável até milhões de recursos
+
+### Casos de Uso
+
+- 📊 **Dashboards**: Gráficos de distribuição de recursos em tempo real
+- 📈 **Relatórios**: Análise de volume por tipo de recurso
+- 🔍 **Monitoramento**: Detectar padrões anormais no ingresso
+- 🎯 **Planejamento**: Demanda por tipo de exame (CT vs MR vs US)

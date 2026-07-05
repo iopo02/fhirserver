@@ -330,6 +330,49 @@ Common issues:
 
 ---
 
+## Resource Statistics API
+
+The server provides REST endpoints for querying aggregated statistics about FHIR resources (DiagnosticReport and ImagingStudy). These endpoints are useful for dashboards, reports, and monitoring.
+
+### Statistics Endpoints
+
+**Base URL:** `/api/statistics`
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/statistics/diagnostic-report/by-status` | Count DiagnosticReports grouped by status (final, preliminary, amended, etc) |
+| `GET /api/statistics/diagnostic-report/by-category` | Count DiagnosticReports grouped by category (imaging, laboratory, etc) |
+| `GET /api/statistics/imaging-study/by-category` | Count ImagingStudies grouped by modality (CT, MR, US, XC, etc) |
+| `GET /api/statistics/imaging-study/by-status` | Count ImagingStudies grouped by status (available, unavailable, entered-in-error) |
+
+### Example Response
+
+```json
+{
+  "timestamp": "2026-07-05T10:30:00.123456Z",
+  "resourceType": "DiagnosticReport",
+  "groupBy": "status",
+  "data": [
+    { "name": "final", "count": 1250 },
+    { "name": "preliminary", "count": 450 },
+    { "name": "amended", "count": 100 }
+  ],
+  "total": 1800
+}
+```
+
+### Usage Example
+
+```bash
+# Get DiagnosticReport statistics by status
+curl -X GET http://localhost:8080/api/statistics/diagnostic-report/by-status
+
+# Get ImagingStudy statistics by category
+curl -X GET http://localhost:8080/api/statistics/imaging-study/by-category
+```
+
+---
+
 ## Running via [Docker Hub](https://hub.docker.com/r/hapiproject/hapi)
 
 Each tagged/released version of `hapi-fhir-jpaserver` is built as a Docker image and published to Docker hub. To run the published Docker image from DockerHub:
