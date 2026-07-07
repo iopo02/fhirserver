@@ -96,8 +96,10 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Parse allowed origins from config (comma-separated)
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        // Parse allowed origins from config (comma-separated) and trim spaces
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+            .map(String::trim)
+            .toList();
         configuration.setAllowedOrigins(origins);
         
         // Parse allowed methods from config (comma-separated)
