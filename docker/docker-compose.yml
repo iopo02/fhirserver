@@ -77,7 +77,7 @@ services:
       HAPI_URL: "http://hapi-fhir-jpaserver-start:8080"
       
       # Configuração do Pipeline
-      PIPELINE_WORKERS: "8"
+      PIPELINE_WORKERS: "15"
       PIPELINE_TIMEOUT: "30"
       PIPELINE_POLL: "5"
       
