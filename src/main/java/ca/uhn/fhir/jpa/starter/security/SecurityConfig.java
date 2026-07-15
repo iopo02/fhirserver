@@ -58,6 +58,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
                             new AntPathRequestMatcher("/v3/api-docs/**"),   
                             new AntPathRequestMatcher("/**/api-docs/**"),   
                             new AntPathRequestMatcher("/**/swagger-ui/**"),
+                            new AntPathRequestMatcher("/**/swagger-ui"),    // sem trailing slash
                             new AntPathRequestMatcher("/**/metadata/**"), 
                             new AntPathRequestMatcher("/**/swagger-ui.html")
                     ).permitAll()

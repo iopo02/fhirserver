@@ -15,6 +15,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: "admin"
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.postgresql.Driver"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+      HAPI_FHIR_SERVER_ADDRESS: "http://localhost:8080/fhir"
       
       # CORS Configuration (for Swagger-UI and Frontend)
       CORS_ALLOWED_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://hapi-fhir-jpaserver-start:8080,http://localhost:3000,http://127.0.0.1:3000"
