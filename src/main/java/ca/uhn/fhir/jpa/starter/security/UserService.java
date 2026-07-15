@@ -139,7 +139,7 @@ public class UserService {
         }
 
         // Otherwise use regular find all
-        return userRepository.findAll(active, locked, role, pageable);
+        return userRepository.findByFilters(active, locked, role, pageable);
     }
 
     /**

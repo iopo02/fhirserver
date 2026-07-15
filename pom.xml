@@ -567,6 +567,9 @@
                 <version>${maven.compiler.version}</version>
                 <configuration>
                     <release>${java.version}</release>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
 
