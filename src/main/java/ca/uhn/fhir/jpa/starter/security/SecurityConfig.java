@@ -52,6 +52,17 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
 
                     // B. ROTAS TOTALMENTE PÚBLICAS
                     .requestMatchers(
+                            new AntPathRequestMatcher("/"),
+                            new AntPathRequestMatcher("/index.html"),
+                            new AntPathRequestMatcher("/web/**"),
+                            new AntPathRequestMatcher("/css/**"),
+                            new AntPathRequestMatcher("/js/**"),
+                            new AntPathRequestMatcher("/images/**"),
+                            new AntPathRequestMatcher("/fonts/**"),
+                            new AntPathRequestMatcher("/static/**"),
+                            new AntPathRequestMatcher("/public/**"),
+                            new AntPathRequestMatcher("/webjars/**"),
+                            new AntPathRequestMatcher("/resources/**"),
                             new AntPathRequestMatcher("/**/auth/login"),
                             new AntPathRequestMatcher("/**/auth/refresh"),
                             new AntPathRequestMatcher("/dashboard"),
