@@ -19,6 +19,8 @@ import shutil
 import sys
 import time
 import fcntl
+import threading
+from collections import defaultdict
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
@@ -64,6 +66,10 @@ FHIR_HEADERS  = {
 # Instância global de autenticação (inicializada mais adiante)
 auth_manager: Optional[JwtAuthManager] = None
 
+# Locks em memória por recurso FHIR (ex.: Patient/123)
+_resource_locks: Dict[str, threading.Lock] = defaultdict(threading.Lock)
+_resource_locks_guard = threading.Lock()
+
 # ==========================================================
 # LOGGING — stdout + ficheiro
 # ==========================================================
@@ -93,13 +99,13 @@ log = _setup_logging()
 def _build_session() -> requests.Session:
     """
     Cria uma sessão com retry automático para erros de rede
-    e respostas 5xx / 429.  Backoff: 1s, 2s, 4s.
+    e respostas transitórias (incluindo 409). Backoff: 1s, 2s, 4s.
     """
     session = requests.Session()
     retry = Retry(
         total=3,
         backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
+        status_forcelist=[409, 429, 500, 502, 503, 504],
         allowed_methods=["POST", "PUT"],
         raise_on_status=False,
     )
@@ -263,7 +269,16 @@ def send_bundle(bundle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     Se AUTH_ENABLED, adiciona token JWT ao header Authorization.
     Devolve o JSON de resposta ou None em caso de erro.
     """
+    locks_acquired: List[threading.Lock] = []
+
     try:
+        # Serializa apenas recursos com ID explícito (request.url = ResourceType/id).
+        # Ordenar as chaves evita deadlock quando dois bundles partilham recursos.
+        for key in _extract_resource_keys_from_bundle(bundle):
+            lock = _get_resource_lock(key)
+            lock.acquire()
+            locks_acquired.append(lock)
+
         headers = FHIR_HEADERS.copy()
         
         # Adicionar autenticação se ativada
@@ -283,6 +298,9 @@ def send_bundle(bundle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     except requests.exceptions.RequestException as exc:
         log.error(f"Falha de ligação ao HAPI: {exc}")
         return None
+    finally:
+        for lock in reversed(locks_acquired):
+            lock.release()
 
     if response.status_code not in (200, 201):
         log.error(
@@ -292,6 +310,33 @@ def send_bundle(bundle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
 
     return response.json()
+
+
+def _get_resource_lock(resource_key: str) -> threading.Lock:
+    """Retorna (ou cria) lock em memória para uma chave resourceType/id."""
+    with _resource_locks_guard:
+        return _resource_locks[resource_key]
+
+
+def _extract_resource_keys_from_bundle(bundle: Dict[str, Any]) -> List[str]:
+    """
+    Extrai chaves de recursos com ID explícito a partir do Bundle.
+    Só bloqueia URLs do tipo ResourceType/id em operações mutáveis.
+    """
+    keys = set()
+    for entry in bundle.get("entry", []):
+        request = entry.get("request", {})
+        method = str(request.get("method", "")).upper()
+        url = str(request.get("url", "")).strip()
+
+        if method not in {"PUT", "PATCH", "DELETE", "POST"}:
+            continue
+
+        # Ex.: Patient/123. Ignora URLs sem ID explícito (ex.: POST Patient)
+        if "/" in url:
+            keys.add(url)
+
+    return sorted(keys)
 
 
 # ==========================================================
