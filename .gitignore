@@ -172,3 +172,4 @@ Temporary Items
 **/charts/*.tgz
 .claude
 /__pycache__
+logs/.pipeline_auth_cache.json
