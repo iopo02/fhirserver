@@ -100,23 +100,76 @@ data/error/
 
 ## Endereços da Aplicação
 
-### Servidor HAPI FHIR
+### Página Principal do Servidor
 
 ```
-http://<IP_DA_VM>:8080/fhir
+http://<IP>:8080/
+```
+
+### HAPI FHIR
+
+```
+http://<IP>:8080/fhir
 ```
 
 ### Capability Statement
 
 ```
-http://<IP_DA_VM>:8080/fhir/metadata
+http://<IP>:8080/fhir/metadata
 ```
 
 ### Swagger UI
 
 ```
-http://<IP_DA_VM>:8080/swagger-ui/index.html
+http://<IP>:8080/swagger-ui/
 ```
+
+---
+
+## Funcionalidades Desenvolvidas
+
+Para além das operações standard disponibilizadas pelo servidor HAPI FHIR, o Projeto 52 implementa um conjunto de funcionalidades adicionais desenvolvidas no âmbito da dissertação.
+
+### Operação FHIR Personalizada – `$summary`
+
+Disponibiliza um resumo clínico agregado de um paciente, reunindo a informação mais relevante dos recursos associados.
+
+**Endpoint**
+
+```text
+GET /fhir/Patient/{id}/$summary
+```
+
+---
+
+### Notificações em Tempo Real (WebSocket)
+
+O servidor disponibiliza um endpoint WebSocket que permite notificar aplicações cliente sempre que ocorre a criação ou atualização de recursos clínicos.
+
+**Endpoint**
+
+```text
+ws://<IP>:8080/ws-patients
+```
+
+Esta funcionalidade é utilizada pelo Dashboard Clínico (Projeto 51) para atualização automática da informação apresentada ao utilizador.
+
+---
+
+### Endpoints Estatísticos
+
+O sistema disponibiliza um conjunto de endpoints REST para obtenção de estatísticas agregadas diretamente sobre os recursos armazenados.
+
+Endpoints disponíveis:
+
+```text
+GET /api/statistics/diagnostic-report/by-status
+GET /api/statistics/diagnostic-report/by-category
+GET /api/statistics/imaging-study/by-status
+GET /api/statistics/imaging-study/by-category
+```
+
+As respostas são disponibilizadas em formato JSON e incluem informação agregada utilizada pelo Dashboard Clínico.
 
 ---
 
